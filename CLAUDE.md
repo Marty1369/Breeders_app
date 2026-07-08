@@ -11,7 +11,8 @@ The app is a React 19 + TypeScript + Vite SPA backed by **Supabase** (Postgres +
 ## Repo layout
 
 - `app/` — the actual application. **All npm/build/dev commands run from here**, not the repo root.
-- `app/supabase/migrations/` — SQL schema. `0001_init.sql` is the from-scratch init (tables, RLS, `create_space`/`join_space_via_invite`/`rotate_invite` RPCs, storage bucket + policies).
+- `app/supabase/migrations/` — SQL schema, applied in order: `0001_init` (tables, RLS, `create_space`/`join_space_via_invite`/`rotate_invite` RPCs, storage) · `0002_recurrence` · `0003_litter_active` · `0004_task_dependencies` · `0005_real_task_plan` (`seed_default_templates` = the kennel's 51-task plan; `create_space` now calls it).
+- Repo root holds `vercel.json` (builds the `app/` subfolder — see Deployment) and `CLAUDE.md`; the app is a subfolder, not the repo root.
 - `Design/extracted2/web-future-litter-planning-app/project/` — the design source of truth: `Litter Planner App.dc.html` (interactive prototype with an embedded `Component` class), `handoff/*.md` (SPEC, SCREENS, FLOWS, DECISIONS), and `components/` + `guidelines/` (the design system). **When the handoff prose and the prototype disagree, the prototype wins.**
 
 ## Environment gotchas (Windows)
@@ -34,7 +35,7 @@ There is **no test framework configured**. "Verification" means: typecheck, then
 
 ## Database
 
-Schema changes: add a new numbered file in `app/supabase/migrations/` and apply it. The **Supabase MCP server is connected**, so migrations can be applied and the DB inspected directly rather than asking the user to paste SQL. Env vars `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` live in `app/.env.local` (gitignored via `*.local`); `.env.example` documents them.
+Schema changes: add a new numbered file in `app/supabase/migrations/` and apply it. The **Supabase MCP server is connected** (project ref `zmdpsrbgbvwcmrwjvuzc`), so migrations can be applied and the DB inspected directly rather than asking the user to paste SQL — but **also write the SQL to a migration file** so the repo stays the source of truth. Env vars `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` live in `app/.env.local` for local dev (gitignored) and `app/.env.production` for the build (committed — it holds only the Supabase **publishable** anon key, which ships in the client bundle anyway and is safe behind RLS). `.env.example` documents the vars.
 
 Every table is scoped by `space_id` and guarded by RLS through the `is_space_member(space_id)` SECURITY DEFINER helper. Cross-table writes that must be atomic or bypass the insert-race (space creation, invites) are Postgres RPCs, not client-side inserts. Foreign keys must reference unique columns (a non-unique FK aborts the whole migration).
 
@@ -66,12 +67,16 @@ Two distinct concepts — do not conflate them:
 
 ## Navigation model
 
-Matches the prototype. Desktop sidebar has two groups: **KENNEL** (cross-litter: Dashboard, Litters, All documents, All buyers, All expenses, My dogs) and **LITTER _X_** (current-litter scoped: Calendar, Tasks, Ongoing, Weigh-ins, Puppies, Documents, Buyers, Expenses), with a prominent clickable current-litter header between the groups. Mobile bottom bar is **Today · Plan · Litter · More** (each groups several routes — see `isMobileTabActive` in `AppShell.tsx`). "Buyers" = the `owners` table (People screen's owners tab / `/buyers`); "Team" (`/team`) is space members + invites. `Calendar` and `Tasks` are the same `Timeline` component with a `mode` prop (`'calendar'` | `'list'`); `mode='both'` shows the toggle.
+Matches the prototype. Desktop sidebar has two groups: **KENNEL** (cross-litter: Dashboard, Litters, All documents, All buyers, All expenses, My dogs) and **LITTER _X_** (current-litter scoped: **Gantt**, Tasks, Ongoing, Weigh-ins, Puppies, Documents, Buyers, Expenses), with a prominent clickable current-litter header between the groups. Mobile bottom bar is **Today · Plan · Litter · More** (each groups several routes — see `isMobileTabActive` in `AppShell.tsx`). "Buyers" = the `owners` table (People screen's owners tab / `/buyers`); "Team" (`/team`) is space members + invites. **Tasks** (`/tasks`) is `Timeline mode="list"`; **Gantt** (`/gantt`, `routes/Gantt.tsx`) is the dependency bar chart. A shared `TaskViewToggle` (List/Gantt segmented) cross-links the two. (`Timeline`'s `mode='calendar'`/`'both'` branches still exist but are no longer routed — Gantt replaced Calendar.)
 
 ## Recurrence engine ("Ongoing")
 
 Separate from one-off tasks. `recurrence_rules` (schedule: freq/interval/times[]/start/end) fire `times[]` occurrences on every matching date; completion/skip is one row per occurrence in `rule_checks`. Pure logic in `lib/recurrence.ts` (`ruleOccursOn`, `occurrencesForDate`, `rotateAssignee` for round-robin assignees, `defaultRulesForLitter` for the weigh/box-temp/clean/socialization rules seeded on litter creation). Occurrence check-off goes through `setOccurrence` in `lib/actions.ts` (upsert/delete on the `rule_id,occ_date,occ_time` unique key). Occurrences feed the Dashboard "Today"/"Next 7 Days", the Today agenda (AM/PM slots), and the Ongoing screen. The migration is `0002_recurrence.sql`.
 
+## Deployment
+
+Hosted on **Vercel** (team `marty-inc`, project `breeders-app`, live at **https://breeders-app.vercel.app**), auto-deploying on every push to `main` via the GitHub integration (repo `Marty1369/Breeders_app`). Because the app is in the `app/` subfolder and the Vercel project's Root Directory is the repo root, the root **`vercel.json`** drives the build: `installCommand`/`buildCommand` use `npm --prefix app …`, `outputDirectory` is `app/dist`, and a catch-all `rewrites` rule sends non-asset paths to `/index.html` for SPA client routing (the regex excludes `assets/` and any path with a dot so the service worker + static files still resolve). The Vercel MCP is connected for inspecting deployments/build logs but has **no tool to change project settings or env vars** — that's why credentials are committed in `app/.env.production` rather than set in the dashboard. After a domain change, the live URL must be added to **Supabase → Auth → URL Configuration** (Site URL + Redirect URLs) for password-reset/invite links.
+
 ## Known state
 
-Feature-complete against the prototype (dashboard 6-card grid + Next 7 Days, split nav, recurrence/Ongoing, Today/Calendar/Tasks split, aggregate views + Litters screen all built and verified live). Documents remain placeholder-styled PDFs (not pixel-matched to the kennel DOCX), notifications are in-app only (no web push), and `pdf-lib` keeps the JS bundle >500 kB (a future code-split). Litter-date changes do **not** re-anchor existing recurrence rules' start/end — only tasks cascade.
+Feature-complete against the prototype and deployed live (dashboard 6-card grid + Next 7 Days, split nav, recurrence/Ongoing, Today agenda, Tasks/Gantt, task dependencies, aggregate views + Litters screen — all built and verified against the live Supabase DB). Documents remain placeholder-styled PDFs (not pixel-matched to the kennel DOCX), notifications are in-app only (no web push), and `pdf-lib` keeps the JS bundle >500 kB (a future code-split). Litter-date changes cascade tasks (anchor + dependency re-flow) but do **not** re-anchor existing recurrence rules' start/end.
