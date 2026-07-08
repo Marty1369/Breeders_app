@@ -1,0 +1,253 @@
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
+
+// ---------------------------------------------------------------------------
+// Shared visual primitives. Kept in one file deliberately: they're small,
+// used everywhere, and this avoids a sprawl of one-line component files.
+// ---------------------------------------------------------------------------
+
+export function Card({ children, className = '', ...rest }: { children: ReactNode; className?: string } & React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={`bg-card border border-card-border rounded-[var(--radius-card)] ${className}`}
+      {...rest}
+    >
+      {children}
+    </div>
+  );
+}
+
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type ButtonSize = 'sm' | 'md' | 'lg';
+
+export function Button({
+  variant = 'primary',
+  size = 'md',
+  icon,
+  className = '',
+  children,
+  ...rest
+}: { variant?: ButtonVariant; size?: ButtonSize; icon?: ReactNode; children: ReactNode } & ButtonHTMLAttributes<HTMLButtonElement>) {
+  const base =
+    'inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] font-extrabold cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap leading-none';
+  const sizes: Record<ButtonSize, string> = {
+    sm: 'min-h-9 px-3.5 text-[12px]',
+    md: 'min-h-11 px-4 text-[13px]',
+    lg: 'min-h-12 px-5 text-[15px]',
+  };
+  const variants: Record<ButtonVariant, string> = {
+    primary: 'bg-accent text-white hover:bg-accent-dark shadow-[0_2px_8px_rgba(23,128,90,0.25)]',
+    secondary: 'border-[1.5px] border-accent text-accent hover:bg-accent-soft',
+    ghost: 'text-muted hover:bg-muted-bg border border-transparent',
+    danger: 'bg-white text-danger border border-[#e0b4ad] hover:bg-danger-soft',
+  };
+  return (
+    <button className={`${base} ${sizes[size]} ${variants[variant]} ${className}`} {...rest}>
+      {icon != null && <span className="text-[1.05em]">{icon}</span>}
+      {children}
+    </button>
+  );
+}
+
+export function TextField({
+  label,
+  className = '',
+  ...rest
+}: { label?: string } & InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <label className="flex flex-col gap-1.5 text-left">
+      {label && <span className="text-[11px] font-extrabold text-muted tracking-wide">{label}</span>}
+      <input
+        className={`min-h-11 px-3 rounded-[var(--radius-control)] border border-border bg-white text-[13.5px] font-semibold text-ink placeholder:text-faint placeholder:font-medium ${className}`}
+        {...rest}
+      />
+    </label>
+  );
+}
+
+export function TextArea({
+  label,
+  className = '',
+  ...rest
+}: { label?: string } & TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return (
+    <label className="flex flex-col gap-1.5 text-left">
+      {label && <span className="text-[11px] font-extrabold text-muted tracking-wide">{label}</span>}
+      <textarea
+        className={`min-h-20 px-3 py-2.5 rounded-[var(--radius-control)] border border-border bg-white text-[13.5px] font-semibold text-ink placeholder:text-faint placeholder:font-medium resize-y ${className}`}
+        {...rest}
+      />
+    </label>
+  );
+}
+
+export function Select({
+  label,
+  className = '',
+  children,
+  ...rest
+}: { label?: string; children: ReactNode } & SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <label className="flex flex-col gap-1.5 text-left">
+      {label && <span className="text-[11px] font-extrabold text-muted tracking-wide">{label}</span>}
+      <select
+        className={`min-h-11 px-3 rounded-[var(--radius-control)] border border-border bg-white text-[13.5px] font-semibold text-ink ${className}`}
+        {...rest}
+      >
+        {children}
+      </select>
+    </label>
+  );
+}
+
+export function Chip({
+  children,
+  tone = 'default',
+  className = '',
+}: {
+  children: ReactNode;
+  tone?: 'default' | 'accent' | 'amber' | 'danger';
+  className?: string;
+}) {
+  const tones: Record<string, string> = {
+    default: 'bg-chip-bg text-muted',
+    accent: 'bg-accent-soft text-accent',
+    amber: 'bg-[#f7ecdc] text-amber',
+    danger: 'bg-danger-soft text-danger',
+  };
+  return (
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10.5px] font-extrabold whitespace-nowrap ${tones[tone]} ${className}`}>
+      {children}
+    </span>
+  );
+}
+
+export function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="inline-flex items-center gap-2 cursor-pointer"
+      aria-pressed={checked}
+    >
+      <span
+        className="relative w-9 h-5 rounded-full transition-colors flex-none"
+        style={{ background: checked ? 'var(--color-accent)' : '#d8dbd6' }}
+      >
+        <span
+          className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all"
+          style={{ left: checked ? '18px' : '2px' }}
+        />
+      </span>
+      {label && <span className="text-[12px] font-bold">{label}</span>}
+    </button>
+  );
+}
+
+export function Avatar({ name, color, size = 33 }: { name: string; color: string; size?: number }) {
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join('');
+  return (
+    <div
+      className="flex-none rounded-full text-white font-extrabold flex items-center justify-center"
+      style={{ width: size, height: size, background: color, fontSize: size * 0.34 }}
+    >
+      {initials}
+    </div>
+  );
+}
+
+export function ProgressBar({ pct }: { pct: number }) {
+  return (
+    <div className="h-[5px] rounded-full bg-[#eef0ec] overflow-hidden">
+      <div className="h-full bg-accent rounded-full transition-[width]" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
+    </div>
+  );
+}
+
+export function EmptyState({ icon, title, subtitle, action }: { icon?: ReactNode; title: string; subtitle?: string; action?: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center text-center gap-3 py-16 px-6">
+      {icon && <div className="text-4xl opacity-60">{icon}</div>}
+      <div className="text-[15px] font-extrabold">{title}</div>
+      {subtitle && <div className="text-[12.5px] text-muted font-semibold max-w-xs">{subtitle}</div>}
+      {action}
+    </div>
+  );
+}
+
+export function SegmentedControl<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+}) {
+  return (
+    <div className="flex gap-[3px] bg-chip-bg rounded-[11px] p-[3px]">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          className={`flex-1 text-center py-2 px-1 rounded-[9px] text-[12px] font-extrabold cursor-pointer transition-colors ${
+            value === o.value ? 'bg-white text-ink shadow-sm' : 'text-muted'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function Sheet({ open, onClose, title, subtitle, children, footer }: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+  footer?: ReactNode;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/35" onClick={onClose} />
+      <div className="relative bg-card w-full sm:max-w-lg sm:rounded-[18px] rounded-t-[18px] max-h-[92vh] flex flex-col shadow-2xl">
+        <div className="flex-none flex items-start justify-between px-5 pt-5 pb-3 border-b border-border-soft">
+          <div>
+            <div className="text-[15.5px] font-extrabold">{title}</div>
+            {subtitle && <div className="text-[11px] text-faint font-semibold mt-0.5">{subtitle}</div>}
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full grid place-items-center text-muted hover:bg-muted-bg cursor-pointer text-lg leading-none">
+            ×
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        {footer && <div className="flex-none px-5 py-4 border-t border-border-soft flex gap-2 justify-end">{footer}</div>}
+      </div>
+    </div>
+  );
+}
+
+export function Spinner({ className = '' }: { className?: string }) {
+  return (
+    <div className={`animate-spin rounded-full border-2 border-border border-t-accent w-5 h-5 ${className}`} />
+  );
+}
+
+export function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 mb-4">
+      <div className="min-w-0 flex-1">
+        <div className="text-[19px] font-extrabold truncate">{title}</div>
+        {subtitle && <div className="text-[11.5px] text-faint font-semibold truncate">{subtitle}</div>}
+      </div>
+      {action}
+    </div>
+  );
+}

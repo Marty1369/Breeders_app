@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "app-dev",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "runtimeArgs": ["app/node_modules/vite/bin/vite.js", "app", "--port", "5173", "--host"],
+      "port": 5173
+    },
+    {
+      "name": "app-preview",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "runtimeArgs": ["app/node_modules/vite/bin/vite.js", "preview", "app", "--port", "4173", "--host"],
+      "port": 4173
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+# Dependencies & build output (app/.gitignore also covers these)
+node_modules/
+dist/
+dist-ssr/
+
+# Env / secrets
+*.local
+.env
+.env.*
+!.env.example
+
+# Design working copies — regenerable from the handoff .zip
+Design/extracted/
+Design/extracted2/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Claude Code per-user settings (keep launch.json shared)
+.claude/settings.local.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.suo
+.idea/

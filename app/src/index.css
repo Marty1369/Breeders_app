@@ -1,0 +1,79 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Manrope", system-ui, sans-serif;
+
+  /* surfaces */
+  --color-app-bg: #f4f3ee;
+  --color-card: #ffffff;
+  --color-card-border: #ebebe6;
+  --color-border: #e7e5de;
+  --color-border-soft: #f1f1ec;
+  --color-muted-bg: #f7f8f5;
+  --color-chip-bg: #eef0ec;
+
+  /* text */
+  --color-ink: #191c1a;
+  --color-muted: #6b7370;
+  --color-faint: #8a938e;
+
+  /* brand */
+  --color-accent: #17805a;
+  --color-accent-dark: #123f2d;
+  --color-accent-soft: #e3f1ea;
+  --color-accent-softer: #b9d8c9;
+
+  /* status */
+  --color-amber: #b97324;
+  --color-amber-soft: #d9a05c;
+  --color-danger: #b93a2e;
+  --color-danger-soft: #f6e6e3;
+
+  --radius-card: 14px;
+  --radius-control: 12px;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-app-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--color-accent-dark);
+  text-decoration: underline;
+}
+
+input, select, textarea, button {
+  font-family: inherit;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+  border-radius: 6px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #d8d6cd;
+  border-radius: 99px;
+}
