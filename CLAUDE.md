@@ -73,9 +73,17 @@ Matches the prototype. Desktop sidebar has two groups: **KENNEL** (cross-litter:
 
 Separate from one-off tasks. `recurrence_rules` (schedule: freq/interval/times[]/start/end) fire `times[]` occurrences on every matching date; completion/skip is one row per occurrence in `rule_checks`. Pure logic in `lib/recurrence.ts` (`ruleOccursOn`, `occurrencesForDate`, `rotateAssignee` for round-robin assignees, `defaultRulesForLitter` for the weigh/box-temp/clean/socialization rules seeded on litter creation). Occurrence check-off goes through `setOccurrence` in `lib/actions.ts` (upsert/delete on the `rule_id,occ_date,occ_time` unique key). Occurrences feed the Dashboard "Today"/"Next 7 Days", the Today agenda (AM/PM slots), and the Ongoing screen. The migration is `0002_recurrence.sql`.
 
-## Deployment
+## Deployment & environments
 
-Hosted on **Vercel** (team `marty-inc`, project `breeders-app`, live at **https://breeders-app.vercel.app**), auto-deploying on every push to `main` via the GitHub integration (repo `Marty1369/Breeders_app`). Because the app is in the `app/` subfolder and the Vercel project's Root Directory is the repo root, the root **`vercel.json`** drives the build: `installCommand`/`buildCommand` use `npm --prefix app …`, `outputDirectory` is `app/dist`, and a catch-all `rewrites` rule sends non-asset paths to `/index.html` for SPA client routing (the regex excludes `assets/` and any path with a dot so the service worker + static files still resolve). The Vercel MCP is connected for inspecting deployments/build logs but has **no tool to change project settings or env vars** — that's why credentials are committed in `app/.env.production` rather than set in the dashboard. After a domain change, the live URL must be added to **Supabase → Auth → URL Configuration** (Site URL + Redirect URLs) for password-reset/invite links.
+**Full details in `docs/ENVIRONMENTS.md` — read it before touching env/deploy/DB-rollback.** Summary:
+
+Hosted on **Vercel** (team `marty-inc`, project `breeders-app`, live at **https://breeders-app.vercel.app**), auto-deploying on every push to `main` via the GitHub integration (repo `Marty1369/Breeders_app`). The app is in the `app/` subfolder and the Vercel Root Directory is the repo root, so the root **`vercel.json`** drives the build (`npm --prefix app …`, `outputDirectory: app/dist`, plus a catch-all SPA `rewrites` rule). The Vercel MCP is connected for inspecting deployments/build logs but has **no tool to change project settings or env vars**.
+
+**Two isolated Supabase projects** so testing never hits production data: production (`zmdpsrbgbvwcmrwjvuzc`) and staging (`dxvrnvvmfjvsynizltwb`), both applied from the same `migrations/` files. `app/src/lib/supabase.ts` picks the DB at build time: explicit `VITE_SUPABASE_URL` override → else `VITE_APP_ENV === 'production'` → prod → else **staging** (safe default). `VITE_APP_ENV` is injected in `vite.config.ts` from Vercel's `VERCEL_ENV`, so the `main` production deploy uses prod and every preview/branch deploy + local dev uses staging. No creds are committed; a **STAGING** badge shows in the header when not on production. `app/.env.local` (gitignored) points local dev at staging.
+
+**Versioning & rollback** — git tags mark releases with a version↔migration map (`v1.0.0` = single-env baseline @ migration 0006; `v1.1.0` = staging setup). Revert the **app** via Vercel "Promote previous deployment" or a git tag (frontend is stateless). Revert the **DB** via the paired down-migrations in `app/supabase/migrations/down/`, or Supabase Backups/PITR for a full point-in-time restore, or re-run `0001…` on a fresh project. After any domain change, add the URL to **Supabase → Auth → URL Configuration** per environment.
+
+**Migration discipline:** every new `migrations/NNNN_*.sql` gets a paired `migrations/down/NNNN_*_down.sql`; apply to **staging first**, then production; commit both.
 
 ## Known state
 
