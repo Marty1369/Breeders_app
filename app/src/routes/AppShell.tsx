@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
+import { activeEnv } from '../lib/supabase';
 import { Avatar, Button } from '../components/ui';
 import { niceDate, todayStr, diffDays } from '../lib/dates';
 import { effectiveDate } from '../lib/scheduling';
@@ -169,8 +170,13 @@ export default function AppShell() {
                 <Logo size={32} />
               </Link>
             )}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 flex items-center gap-2">
               <div className="text-[15px] font-extrabold truncate">{space?.kennel_name || space?.name}</div>
+              {activeEnv !== 'production' && (
+                <span className="flex-none px-2 py-0.5 rounded-full text-[9.5px] font-extrabold tracking-wide bg-amber text-white">
+                  STAGING
+                </span>
+              )}
             </div>
             {isDesktop && activeLitter && (
               <>

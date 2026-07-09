@@ -3,13 +3,12 @@ node_modules/
 dist/
 dist-ssr/
 
-# Env / secrets
+# Env / secrets — all env files ignored except the example. Supabase creds are
+# no longer committed; src/lib/supabase.ts routes prod/staging by VITE_APP_ENV.
 *.local
 .env
 .env.*
 !.env.example
-# .env.production holds only the public Supabase publishable key (safe to commit)
-!.env.production
 
 # Design working copies — regenerable from the handoff .zip
 Design/extracted/
