@@ -315,6 +315,47 @@ export interface Notification {
   created_at: string;
 }
 
+// --- Whelping (0008_kennel_data_model.sql, 0010_log_birth_rpc.sql) ---
+
+export type DeliveryMode = 'natural' | 'c_section' | 'mixed';
+
+export interface WhelpingSession {
+  id: string;
+  space_id: string;
+  litter_id: string;
+  mucus_plug_at: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  delivery_mode: DeliveryMode | null;
+  vet_attended: boolean;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface BirthEvent {
+  id: string;
+  space_id: string;
+  litter_id: string;
+  session_id: string | null;
+  puppy_id: string | null;
+  seq: number | null;
+  born_at: string | null;
+  type: 'born' | 'stillborn';
+  sex: 'male' | 'female' | null;
+  color: string | null;
+  weight_g: number | null;
+  markings: string | null;
+  dewclaws: string | null;
+  palate_ok: boolean | null;
+  presentation: string | null;
+  placenta_passed: boolean | null;
+  calcium_given: boolean | null;
+  collar_color: string | null;
+  photo: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
 // --- Recurrence (0002_recurrence.sql) ---
 
 export type RuleScope = 'kennel' | 'litter';

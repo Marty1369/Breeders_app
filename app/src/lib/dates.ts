@@ -25,9 +25,14 @@ export function addDays(s: string, n: number): string {
 }
 
 export function addMonths(s: string, n: number): string {
-  const d = parseDate(s);
-  d.setMonth(d.getMonth() + n);
-  return fmt(d);
+  const [y, m, day] = s.split('-').map(Number);
+  const targetMonthIndex = m - 1 + n;
+  const ty = y + Math.floor(targetMonthIndex / 12);
+  const tm = ((targetMonthIndex % 12) + 12) % 12; // 0-11
+  // Clamp the day to the last valid day of the target month so e.g.
+  // Dec 31 + 2mo -> Feb 28/29 (not Mar 3), and Jul 31 + 2mo -> Sep 30 (not Oct 1).
+  const lastDay = new Date(ty, tm + 1, 0).getDate();
+  return fmt(new Date(ty, tm, Math.min(day, lastDay)));
 }
 
 export function diffDays(a: string, b: string): number {

@@ -2,8 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthProvider';
 import type {
-  Dog, DocumentRecord, Expense, HealthEntry, Litter, Notification, Owner, Payer, Puppy,
-  RecurrenceRule, RuleCheck, Space, SpaceMember, Task, TaskTemplate, Upload,
+  BirthEvent, Dog, DocumentRecord, Expense, HealthEntry, Litter, Notification, Owner, Payer, Puppy,
+  RecurrenceRule, RuleCheck, Space, SpaceMember, Task, TaskTemplate, Upload, WhelpingSession,
 } from '../lib/types';
 
 function useTable<T extends { id: string }>(table: string, spaceId: string | null) {
@@ -80,6 +80,8 @@ interface SpaceContextValue {
   uploads: Upload[];
   recurrenceRules: RecurrenceRule[];
   ruleChecks: RuleCheck[];
+  whelpingSessions: WhelpingSession[];
+  birthEvents: BirthEvent[];
   notifications: Notification[];
   activeLitterId: string | null;
   setActiveLitterId: (id: string | null) => void;
@@ -148,6 +150,8 @@ export function SpaceProvider({ children }: { children: ReactNode }) {
   const { rows: uploads } = useTable<Upload>('uploads', spaceId);
   const { rows: recurrenceRules } = useTable<RecurrenceRule>('recurrence_rules', spaceId);
   const { rows: ruleChecks } = useTable<RuleCheck>('rule_checks', spaceId);
+  const { rows: whelpingSessions } = useTable<WhelpingSession>('whelping_sessions', spaceId);
+  const { rows: birthEvents } = useTable<BirthEvent>('birth_events', spaceId);
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   useEffect(() => {
@@ -228,6 +232,8 @@ export function SpaceProvider({ children }: { children: ReactNode }) {
     uploads,
     recurrenceRules,
     ruleChecks,
+    whelpingSessions,
+    birthEvents,
     notifications,
     activeLitterId,
     setActiveLitterId: setActiveLitterIdState,

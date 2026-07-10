@@ -4,9 +4,9 @@
 import { supabase } from './supabase';
 import { applyCascade, cascadePreview, recomputeLitterDates, setActualDate } from './scheduling';
 import { scheduleUpdates } from './dependencies';
-import { todayStr } from './dates';
+import { fmt, todayStr } from './dates';
 import type { DateKey } from './scheduling';
-import type { Litter, NotificationKind, SpaceMember, Task } from './types';
+import type { BirthEvent, Litter, NotificationKind, Puppy, SpaceMember, Task } from './types';
 
 /** Set/clear the completion state of a single recurring-rule occurrence. */
 export async function setOccurrence(
@@ -128,6 +128,11 @@ export async function completeTaskWithResult(
 
   if (!litter) return { confirmedOvulation: false };
 
+  // Positive ultrasound moves the litter into the pregnant state (was never written).
+  if (resultLog?.type === 'ultrasound' && resultLog.value === 'pregnant' && litter.status === 'planned') {
+    await supabase.from('litters').update({ status: 'pregnant' }).eq('id', litter.id);
+  }
+
   if (resultLog?.type === 'progesterone' && Number(resultLog.value) >= 18) {
     const newDates = recomputeLitterDates({ ...litter.dates, ovulation: { predicted: litter.dates.ovulation?.predicted ?? null, actual: task.start_date } });
     await applyDateChange(litter, tasks, members, newDates, actorUserId);
@@ -136,16 +141,71 @@ export async function completeTaskWithResult(
   return { confirmedOvulation: false };
 }
 
-/** Whelping birth log: opening it fires whelping_started; finishing sets actual birth date + cascade. */
+/**
+ * Whelping birth log (writes to whelping_sessions + birth_events, migration 0008/0010).
+ *
+ * startWhelping opens the session but does NOT flip the litter to `born` (that
+ * used to happen before a single puppy existed). logBirth atomically creates
+ * the puppy + birth event via the RPC. finishWhelping closes the session, sets
+ * the actual birth date from the first live birth, and cascades.
+ */
 export async function startWhelping(litter: Litter, members: SpaceMember[], actorUserId?: string) {
-  if (litter.status !== 'born') {
-    await supabase.from('litters').update({ status: 'born' }).eq('id', litter.id);
-  }
+  // One session per litter (unique on litter_id); ignore if it already exists.
+  await supabase
+    .from('whelping_sessions')
+    .upsert({ space_id: litter.space_id, litter_id: litter.id, started_at: new Date().toISOString() }, { onConflict: 'litter_id', ignoreDuplicates: true });
   await notifyMembers(litter.space_id, members, 'whelping_started', `${litter.name}: whelping started`, undefined, litter.id, actorUserId);
 }
 
-export async function finishWhelping(litter: Litter, tasks: Task[], members: SpaceMember[], actorUserId?: string) {
-  const birthDate = litter.whelping_log.find((e) => e.type === 'born')?.ts.slice(0, 10) ?? todayStr();
+/** Atomically create the puppy (for a live birth) + birth event. Returns the new birth_event id. */
+export async function logBirth(litter: Litter, type: 'born' | 'stillborn'): Promise<string | null> {
+  const { data, error } = await supabase.rpc('log_birth', {
+    p_litter_id: litter.id,
+    p_type: type,
+    p_born_at: new Date().toISOString(),
+  });
+  if (error) {
+    console.error('log_birth', error);
+    return null;
+  }
+  return (data as string) ?? null;
+}
+
+/** Save one birth event's details and mirror the fields the rest of the app reads off the puppy row. */
+export async function saveBirthDetails(event: BirthEvent, patch: Partial<BirthEvent>) {
+  await supabase.from('birth_events').update(patch).eq('id', event.id);
+  if (event.puppy_id) {
+    const puppyPatch: Partial<Puppy> = {};
+    if ('sex' in patch) puppyPatch.sex = patch.sex ?? null;
+    if ('color' in patch) puppyPatch.color = patch.color ?? null;
+    if ('collar_color' in patch) puppyPatch.collar_color = patch.collar_color ?? null;
+    if ('markings' in patch) puppyPatch.markings = patch.markings ?? null;
+    if ('weight_g' in patch) puppyPatch.birth_weight = patch.weight_g ?? null;
+    if (Object.keys(puppyPatch).length) {
+      await supabase.from('puppies').update(puppyPatch).eq('id', event.puppy_id);
+    }
+  }
+}
+
+export async function finishWhelping(
+  litter: Litter,
+  tasks: Task[],
+  members: SpaceMember[],
+  birthEvents: BirthEvent[],
+  actorUserId?: string
+) {
+  const litterBirths = birthEvents
+    .filter((e) => e.litter_id === litter.id && e.type === 'born' && e.born_at)
+    .sort((a, b) => (a.born_at! < b.born_at! ? -1 : 1));
+  // Use the LOCAL calendar date of the first live birth (not a UTC slice, which
+  // could roll an overnight birth to the wrong day).
+  const birthDate = litterBirths[0]?.born_at ? fmt(new Date(litterBirths[0].born_at!)) : todayStr();
+
+  await supabase.from('whelping_sessions').update({ ended_at: new Date().toISOString() }).eq('litter_id', litter.id);
+  if (litter.status !== 'born') {
+    await supabase.from('litters').update({ status: 'born' }).eq('id', litter.id);
+  }
+
   const newDates = setActualDate(litter.dates, 'whelping', birthDate);
   await applyDateChange(litter, tasks, members, newDates, actorUserId);
 }
