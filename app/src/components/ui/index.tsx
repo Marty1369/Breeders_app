@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 
 // ---------------------------------------------------------------------------
@@ -51,16 +52,56 @@ export function Button({
 export function TextField({
   label,
   className = '',
+  type,
   ...rest
 }: { label?: string } & InputHTMLAttributes<HTMLInputElement>) {
+  const [revealed, setRevealed] = useState(false);
+  const isPassword = type === 'password';
+  const effectiveType = isPassword ? (revealed ? 'text' : 'password') : type;
+
   return (
     <label className="flex flex-col gap-1.5 text-left">
       {label && <span className="text-[11px] font-extrabold text-muted tracking-wide">{label}</span>}
-      <input
-        className={`min-h-11 px-3 rounded-[var(--radius-control)] border border-border bg-white text-[13.5px] font-semibold text-ink placeholder:text-faint placeholder:font-medium ${className}`}
-        {...rest}
-      />
+      <div className="relative flex">
+        <input
+          type={effectiveType}
+          className={`min-h-11 px-3 w-full rounded-[var(--radius-control)] border border-border bg-white text-[13.5px] font-semibold text-ink placeholder:text-faint placeholder:font-medium ${isPassword ? 'pr-10' : ''} ${className}`}
+          {...rest}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={() => setRevealed((v) => !v)}
+            aria-label={revealed ? 'Hide password' : 'Show password'}
+            title={revealed ? 'Hide password' : 'Show password'}
+            className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 grid place-items-center rounded-full text-muted hover:text-ink hover:bg-muted-bg cursor-pointer"
+          >
+            {revealed ? <EyeOff /> : <Eye />}
+          </button>
+        )}
+      </div>
     </label>
+  );
+}
+
+function Eye() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function EyeOff() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.5 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.68" />
+      <path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.39-1.61" />
+      <path d="m2 2 20 20" />
+      <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+    </svg>
   );
 }
 

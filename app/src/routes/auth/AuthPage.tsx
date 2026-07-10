@@ -1,23 +1,26 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { setPendingInvite } from '../../lib/invite';
 import { Button, Card, SegmentedControl, TextField } from '../../components/ui';
 
 export default function AuthPage() {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [params] = useSearchParams();
+  const inviteToken = params.get('invite');
+  const [mode, setMode] = useState<'signin' | 'signup'>(inviteToken ? 'signup' : 'signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
-  const [params] = useSearchParams();
-  const inviteToken = params.get('invite');
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setBusy(true);
+    // Persist the invite so it survives the sign-up session round-trip.
+    if (inviteToken) setPendingInvite(inviteToken);
     try {
       if (mode === 'signup') {
         const { error: signUpError } = await supabase.auth.signUp({

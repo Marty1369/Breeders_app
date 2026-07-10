@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../state/AuthProvider';
 import { useSpace } from '../../state/SpaceProvider';
+import { clearPendingInvite, setPendingInvite } from '../../lib/invite';
 import { Button, Card, Spinner, TextField } from '../../components/ui';
 
 export default function JoinInvite() {
@@ -13,6 +14,11 @@ export default function JoinInvite() {
   const [name, setName] = useState((user?.user_metadata?.full_name as string) || '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Remember the invite immediately so it survives the sign-up round-trip.
+  useEffect(() => {
+    if (token) setPendingInvite(token);
+  }, [token]);
 
   useEffect(() => {
     if (!loading && !user && token) {
@@ -33,6 +39,7 @@ export default function JoinInvite() {
       setError(err.message === 'invite_invalid_or_expired' ? 'This invite link is invalid or has expired.' : err.message);
       return;
     }
+    clearPendingInvite();
     reloadMembership();
     navigate('/', { replace: true });
   }

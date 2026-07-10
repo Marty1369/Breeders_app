@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../state/AuthProvider';
 import { useSpace } from '../../state/SpaceProvider';
+import { clearPendingInvite } from '../../lib/invite';
 import { Button, Card, TextField } from '../../components/ui';
 
 export default function CreateSpaceWizard() {
@@ -41,6 +42,7 @@ export default function CreateSpaceWizard() {
       setError(err.message);
       return;
     }
+    clearPendingInvite();
     reloadMembership();
   }
 

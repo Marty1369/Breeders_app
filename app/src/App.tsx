@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './state/AuthProvider';
 import { useSpace } from './state/SpaceProvider';
+import { getPendingInvite } from './lib/invite';
 import { Spinner } from './components/ui';
 import AuthPage from './routes/auth/AuthPage';
 import ForgotPassword from './routes/auth/ForgotPassword';
@@ -35,6 +36,12 @@ function Authenticated() {
   const { loading, hasSpace } = useSpace();
   if (loading) return <FullScreenSpinner />;
 
+  // An authenticated user with no space yet: if they arrived via an invite,
+  // send them to join it — never to create-space (that's how invitees used to
+  // accidentally spin up a second kennel).
+  const pendingInvite = hasSpace ? null : getPendingInvite();
+  const noSpaceTarget = pendingInvite ? `/join/${pendingInvite}` : '/onboarding/create-space';
+
   return (
     <Routes>
       <Route
@@ -43,7 +50,7 @@ function Authenticated() {
       />
       <Route
         path="/*"
-        element={hasSpace ? <AppShell /> : <Navigate to="/onboarding/create-space" replace />}
+        element={hasSpace ? <AppShell /> : <Navigate to={noSpaceTarget} replace />}
       />
     </Routes>
   );
