@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
 import { Button, Card, Chip, EmptyState, PageHeader, Select, Sheet, TextField } from '../components/ui';
-import { niceDate, todayStr } from '../lib/dates';
+import { addDays, niceDate, todayStr } from '../lib/dates';
 import { nextHeatPredicted } from '../lib/scheduling';
 import type { Dog } from '../lib/types';
 import NewLitterWizard from '../components/NewLitterWizard';
@@ -352,6 +352,22 @@ function LogHeatSheet({ dog, onClose }: { dog: Dog | null; onClose: () => void }
       }
     >
       <TextField label="Heat start date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+
+      {date && (
+        <div className="mt-3 bg-app-bg border border-border-soft rounded-[10px] p-3">
+          <div className="text-[10px] font-extrabold tracking-wider text-faint mb-2">PREDICTED FROM THIS HEAT</div>
+          <div className="flex flex-col gap-1.5 text-[12px] font-semibold">
+            <div className="flex justify-between"><span className="text-muted">Fertile window</span><span>{niceDate(addDays(date, 11))} – {niceDate(addDays(date, 15))}</span></div>
+            <div className="flex justify-between"><span className="text-muted">Optimal breeding (ovulation)</span><span className="text-accent font-extrabold">{niceDate(addDays(date, 13))}</span></div>
+            <div className="flex justify-between"><span className="text-muted">Second mating</span><span>{niceDate(addDays(date, 15))}</span></div>
+            <div className="flex justify-between"><span className="text-muted">Predicted whelping</span><span>{niceDate(addDays(date, 75))}</span></div>
+          </div>
+          <div className="text-[10.5px] text-faint font-semibold mt-2">
+            Confirm with a progesterone test around the fertile window — log it when you complete the progesterone task.
+          </div>
+        </div>
+      )}
+
       {dog && dog.heats.length > 0 && (
         <div className="mt-4">
           <div className="text-[10px] font-extrabold tracking-wider text-faint mb-1.5">HISTORY</div>
