@@ -12,6 +12,7 @@ export default function AuthPage() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [confirmSent, setConfirmSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
 
@@ -23,12 +24,19 @@ export default function AuthPage() {
     if (inviteToken) setPendingInvite(inviteToken);
     try {
       if (mode === 'signup') {
-        const { error: signUpError } = await supabase.auth.signUp({
+        const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { full_name: name } },
         });
         if (signUpError) throw signUpError;
+        // When the project requires email confirmation, signUp() succeeds but
+        // returns no session. Navigating on would bounce straight back to
+        // /login with no explanation, stranding the user.
+        if (!data.session) {
+          setConfirmSent(true);
+          return;
+        }
         navigate(inviteToken ? `/join/${inviteToken}` : '/onboarding/create-space');
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
@@ -56,7 +64,28 @@ export default function AuthPage() {
           <div className="text-[16px] font-extrabold">Litter Planner</div>
         </div>
 
-        <Card className="p-5">
+        {confirmSent && (
+          <Card className="p-5 text-center">
+            <div className="text-[15px] font-extrabold mb-1.5">Check your email</div>
+            <div className="text-[12.5px] font-semibold text-muted">
+              We sent a confirmation link to <span className="text-ink">{email}</span>. Open it to activate your
+              account, then come back and sign in.
+            </div>
+            <Button
+              variant="secondary"
+              className="mt-4 w-full"
+              onClick={() => {
+                setConfirmSent(false);
+                setMode('signin');
+                setPassword('');
+              }}
+            >
+              Back to sign in
+            </Button>
+          </Card>
+        )}
+
+        <Card className={`p-5 ${confirmSent ? 'hidden' : ''}`}>
           <SegmentedControl
             value={mode}
             onChange={(v) => setMode(v)}
@@ -74,9 +103,9 @@ export default function AuthPage() {
 
           <form onSubmit={submit} className="flex flex-col gap-3 mt-4">
             {mode === 'signup' && (
-              <TextField label="Your name" value={name} onChange={(e) => setName(e.target.value)} required placeholder="Aurelija Kazlauskienė" />
+              <TextField label="Your name" value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" placeholder="Aurelija Kazlauskienė" />
             )}
-            <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@kennel.com" />
+            <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" placeholder="you@kennel.com" />
             <TextField
               label="Password"
               type="password"
@@ -84,6 +113,7 @@ export default function AuthPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
+              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
               placeholder="••••••••"
             />
             {error && <div className="text-[12px] font-semibold text-danger">{error}</div>}
