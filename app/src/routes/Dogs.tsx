@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
@@ -18,6 +18,7 @@ export default function Dogs() {
   const { space, dogs, litters } = useSpace();
   const [params, setParams] = useSearchParams();
   const [addOpen, setAddOpen] = useState(false);
+  const [editDog, setEditDog] = useState<Dog | null>(null);
   const [wizardDog, setWizardDog] = useState<Dog | null>(null);
   const [heatDog, setHeatDog] = useState<Dog | null>(null);
 
@@ -51,7 +52,7 @@ export default function Dogs() {
           {owned.length > 0 && (
             <div className="flex flex-col gap-2.5">
               {owned.map((d) => (
-                <DogCard key={d.id} dog={d} litterCount={litterCount(d.id)} onStartLitter={() => setWizardDog(d)} onLogHeat={() => setHeatDog(d)} />
+                <DogCard key={d.id} dog={d} litterCount={litterCount(d.id)} onStartLitter={() => setWizardDog(d)} onLogHeat={() => setHeatDog(d)} onEdit={() => setEditDog(d)} />
               ))}
             </div>
           )}
@@ -60,7 +61,7 @@ export default function Dogs() {
               <div className="text-[10px] font-extrabold tracking-wider text-faint mb-1.5 mt-2">EXTERNAL STUDS</div>
               <div className="flex flex-col gap-2.5">
                 {external.map((d) => (
-                  <DogCard key={d.id} dog={d} litterCount={litterCount(d.id)} onStartLitter={() => setWizardDog(d)} onLogHeat={() => setHeatDog(d)} />
+                  <DogCard key={d.id} dog={d} litterCount={litterCount(d.id)} onStartLitter={() => setWizardDog(d)} onLogHeat={() => setHeatDog(d)} onEdit={() => setEditDog(d)} />
                 ))}
               </div>
             </div>
@@ -68,7 +69,8 @@ export default function Dogs() {
         </div>
       )}
 
-      <AddDogSheet open={addOpen} onClose={() => setAddOpen(false)} />
+      <DogFormSheet open={addOpen} dog={null} litterCount={0} onClose={() => setAddOpen(false)} />
+      <DogFormSheet open={editDog !== null} dog={editDog} litterCount={editDog ? litterCount(editDog.id) : 0} onClose={() => setEditDog(null)} />
       <LogHeatSheet dog={heatDog} onClose={() => setHeatDog(null)} />
       <NewLitterWizard
         open={wizardOpen}
@@ -91,11 +93,13 @@ function DogCard({
   litterCount,
   onStartLitter,
   onLogHeat,
+  onEdit,
 }: {
   dog: Dog;
   litterCount: number;
   onStartLitter: () => void;
   onLogHeat: () => void;
+  onEdit: () => void;
 }) {
   const age = ageFromDob(dog.dob);
   return (
@@ -110,8 +114,12 @@ function DogCard({
           <div className="text-[11px] text-faint font-semibold mt-0.5">
             {[dog.breed, age, dog.reg_no].filter(Boolean).join(' · ') || '—'}
           </div>
+          {dog.titles && <div className="text-[11px] text-accent font-extrabold mt-0.5">{dog.titles}</div>}
         </div>
-        <div className="text-[11px] font-extrabold text-muted whitespace-nowrap">{litterCount} litter{litterCount === 1 ? '' : 's'}</div>
+        <div className="flex items-center gap-3">
+          <div className="text-[11px] font-extrabold text-muted whitespace-nowrap">{litterCount} litter{litterCount === 1 ? '' : 's'}</div>
+          <button onClick={onEdit} className="text-[11px] font-extrabold text-accent cursor-pointer">Edit</button>
+        </div>
       </div>
 
       {dog.sex === 'female' && !dog.is_external && (
@@ -145,13 +153,37 @@ function DogCard({
   );
 }
 
-function AddDogSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+const BLANK_DOG_FORM = {
+  name: '', sex: 'female' as 'female' | 'male', breed: '', dob: '', regNo: '', chipNo: '', registry: '',
+  color: '', tail: '', eyes: '', eyesExamDate: '', hips: '', elbows: '', dentition: '', bite: '',
+  titles: '', showResults: '', workingTests: '', faults: '', geneticsNotes: '',
+  isExternal: false, extName: '', extPhone: '', extCity: '',
+};
+
+function DogFormSheet({ open, dog, litterCount, onClose }: { open: boolean; dog: Dog | null; litterCount: number; onClose: () => void }) {
   const { space } = useSpace();
-  const [form, setForm] = useState({
-    name: '', sex: 'female' as 'female' | 'male', breed: '', dob: '', regNo: '', chipNo: '', hips: '',
-    isExternal: false, extName: '', extPhone: '', extCity: '',
-  });
+  const isEdit = dog !== null;
+  const [form, setForm] = useState(BLANK_DOG_FORM);
   const [busy, setBusy] = useState(false);
+
+  // Hydrate the form from the dog in edit mode; reset to blank in add mode.
+  useEffect(() => {
+    if (!open) return;
+    if (dog) {
+      setForm({
+        name: dog.name, sex: dog.sex, breed: dog.breed || '', dob: dog.dob || '',
+        regNo: dog.reg_no || '', chipNo: dog.chip_no || '', registry: dog.registry || '',
+        color: dog.color || '', tail: dog.tail || '', eyes: dog.eyes || '', eyesExamDate: dog.eyes_exam_date || '',
+        hips: dog.hips || '', elbows: dog.elbows || '', dentition: dog.dentition || '', bite: dog.bite || '',
+        titles: dog.titles || '', showResults: dog.show_results || '', workingTests: dog.working_tests || '',
+        faults: dog.faults || '', geneticsNotes: dog.genetics_notes || '',
+        isExternal: dog.is_external,
+        extName: dog.external_owner?.name || '', extPhone: dog.external_owner?.phone || '', extCity: dog.external_owner?.city || '',
+      });
+    } else {
+      setForm(BLANK_DOG_FORM);
+    }
+  }, [dog, open]);
 
   function set<K extends keyof typeof form>(k: K, v: typeof form[K]) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -160,20 +192,46 @@ function AddDogSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
   async function save() {
     if (!space || !form.name.trim()) return;
     setBusy(true);
-    await supabase.from('dogs').insert({
-      space_id: space.id,
+    const payload = {
       name: form.name.trim(),
       sex: form.sex,
       breed: form.breed || null,
       dob: form.dob || null,
       reg_no: form.regNo || null,
       chip_no: form.chipNo || null,
+      registry: form.registry || null,
+      color: form.color || null,
+      tail: form.tail || null,
+      eyes: form.eyes || null,
+      eyes_exam_date: form.eyesExamDate || null,
       hips: form.hips || null,
+      elbows: form.elbows || null,
+      dentition: form.dentition || null,
+      bite: form.bite || null,
+      titles: form.titles || null,
+      show_results: form.showResults || null,
+      working_tests: form.workingTests || null,
+      faults: form.faults || null,
+      genetics_notes: form.geneticsNotes || null,
       is_external: form.isExternal,
       external_owner: form.isExternal ? { name: form.extName, phone: form.extPhone, city: form.extCity } : null,
-    });
+    };
+    if (isEdit) {
+      await supabase.from('dogs').update(payload).eq('id', dog!.id);
+    } else {
+      await supabase.from('dogs').insert({ space_id: space.id, ...payload });
+    }
     setBusy(false);
-    setForm({ name: '', sex: 'female', breed: '', dob: '', regNo: '', chipNo: '', hips: '', isExternal: false, extName: '', extPhone: '', extCity: '' });
+    onClose();
+  }
+
+  async function remove() {
+    if (!dog) return;
+    if (litterCount > 0) return; // guarded in UI too
+    if (!confirm(`Delete ${dog.name}? This cannot be undone.`)) return;
+    setBusy(true);
+    await supabase.from('dogs').delete().eq('id', dog.id);
+    setBusy(false);
     onClose();
   }
 
@@ -181,8 +239,8 @@ function AddDogSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
     <Sheet
       open={open}
       onClose={onClose}
-      title="Add dog"
-      subtitle="Dam, sire, or external stud"
+      title={isEdit ? `Edit — ${dog?.name ?? ''}` : 'Add dog'}
+      subtitle={isEdit ? undefined : 'Dam, sire, or external stud'}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
@@ -192,19 +250,47 @@ function AddDogSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
     >
       <div className="flex flex-col gap-3">
         <TextField label="Name" value={form.name} onChange={(e) => set('name', e.target.value)} autoFocus />
-        <Select label="Sex" value={form.sex} onChange={(e) => set('sex', e.target.value as 'female' | 'male')}>
-          <option value="female">Female (dam)</option>
-          <option value="male">Male (sire)</option>
-        </Select>
         <div className="grid grid-cols-2 gap-3">
+          <Select label="Sex" value={form.sex} onChange={(e) => set('sex', e.target.value as 'female' | 'male')}>
+            <option value="female">Female (dam)</option>
+            <option value="male">Male (sire)</option>
+          </Select>
           <TextField label="Breed" value={form.breed} onChange={(e) => set('breed', e.target.value)} />
-          <TextField label="Date of birth" type="date" value={form.dob} onChange={(e) => set('dob', e.target.value)} />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <TextField label="Registration no." value={form.regNo} onChange={(e) => set('regNo', e.target.value)} />
-          <TextField label="Chip no." value={form.chipNo} onChange={(e) => set('chipNo', e.target.value)} />
+          <TextField label="Date of birth" type="date" value={form.dob} onChange={(e) => set('dob', e.target.value)} />
+          <TextField label="Color" value={form.color} onChange={(e) => set('color', e.target.value)} />
         </div>
-        <TextField label="Hips" value={form.hips} onChange={(e) => set('hips', e.target.value)} placeholder="A" />
+        <div className="grid grid-cols-2 gap-3">
+          <TextField label="Registry" value={form.registry} onChange={(e) => set('registry', e.target.value)} placeholder="LŠVK / LOF / CMKU" />
+          <TextField label="Registration no." value={form.regNo} onChange={(e) => set('regNo', e.target.value)} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <TextField label="Chip no." value={form.chipNo} onChange={(e) => set('chipNo', e.target.value)} />
+          <TextField label="Tail" value={form.tail} onChange={(e) => set('tail', e.target.value)} placeholder="NBT / long / docked" />
+        </div>
+
+        <div className="text-[10px] font-extrabold tracking-wider text-faint mt-1">HEALTH & CONFORMATION</div>
+        <div className="grid grid-cols-2 gap-3">
+          <TextField label="Hips" value={form.hips} onChange={(e) => set('hips', e.target.value)} placeholder="A" />
+          <TextField label="Elbows" value={form.elbows} onChange={(e) => set('elbows', e.target.value)} placeholder="0" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <TextField label="Eyes" value={form.eyes} onChange={(e) => set('eyes', e.target.value)} placeholder="clear" />
+          <TextField label="Eye exam date" type="date" value={form.eyesExamDate} onChange={(e) => set('eyesExamDate', e.target.value)} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <TextField label="Dentition" value={form.dentition} onChange={(e) => set('dentition', e.target.value)} placeholder="full / 42" />
+          <TextField label="Bite" value={form.bite} onChange={(e) => set('bite', e.target.value)} placeholder="scissor" />
+        </div>
+        <TextField label="Genetic tests" value={form.geneticsNotes} onChange={(e) => set('geneticsNotes', e.target.value)} placeholder="MDR1 & DM (carrier), HSF4, CEA, PRA - clear" />
+
+        <div className="text-[10px] font-extrabold tracking-wider text-faint mt-1">TITLES & RESULTS</div>
+        <TextField label="Titles" value={form.titles} onChange={(e) => set('titles', e.target.value)} placeholder="LT JCH, LV JCH, BALTIC JCH" />
+        <TextField label="Show results" value={form.showResults} onChange={(e) => set('showResults', e.target.value)} placeholder="3xCAC, 2xN" />
+        <TextField label="Working tests" value={form.workingTests} onChange={(e) => set('workingTests', e.target.value)} placeholder="NHAT test" />
+        <TextField label="Faults / notes" value={form.faults} onChange={(e) => set('faults', e.target.value)} />
+
         <label className="flex items-center gap-2 mt-1 cursor-pointer">
           <input type="checkbox" checked={form.isExternal} onChange={(e) => set('isExternal', e.target.checked)} className="w-[18px] h-[18px] accent-[#17805a]" />
           <span className="text-[12.5px] font-bold">This is a visiting/external stud</span>
@@ -216,6 +302,20 @@ function AddDogSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
               <TextField label="Owner phone" value={form.extPhone} onChange={(e) => set('extPhone', e.target.value)} />
               <TextField label="City" value={form.extCity} onChange={(e) => set('extCity', e.target.value)} />
             </div>
+          </div>
+        )}
+
+        {isEdit && (
+          <div className="mt-2 pt-3 border-t border-border-soft">
+            {litterCount > 0 ? (
+              <div className="text-[11px] font-semibold text-faint">
+                Can't delete — this dog is linked to {litterCount} litter{litterCount === 1 ? '' : 's'}.
+              </div>
+            ) : (
+              <button onClick={remove} disabled={busy} className="text-[12px] font-extrabold text-danger cursor-pointer">
+                Delete dog
+              </button>
+            )}
           </div>
         )}
       </div>

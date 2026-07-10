@@ -3,6 +3,15 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
 import { Button, EmptyState, PageHeader, Select, TextField } from '../components/ui';
+import type { PuppyStatus } from '../lib/types';
+
+const STATUS_OPTIONS: { value: PuppyStatus; label: string }[] = [
+  { value: 'available', label: 'Available' },
+  { value: 'reserved', label: 'Reserved' },
+  { value: 'coowned', label: 'Co-owned' },
+  { value: 'export', label: 'Export' },
+  { value: 'deceased', label: 'Deceased' },
+];
 
 export default function PuppyEdit() {
   const { id } = useParams<{ id: string }>();
@@ -12,7 +21,8 @@ export default function PuppyEdit() {
   const litter = litters.find((l) => l.id === puppy?.litter_id);
 
   const [form, setForm] = useState({
-    name: '', sex: '' as '' | 'male' | 'female', color: '', litterAffix: '', regNo: '', chipNo: '', ownerId: '',
+    name: '', sex: '' as '' | 'male' | 'female', color: '', collarColor: '', markings: '',
+    price: '', status: 'available' as PuppyStatus, litterAffix: '', regNo: '', chipNo: '', ownerId: '',
   });
   const [busy, setBusy] = useState(false);
 
@@ -22,6 +32,10 @@ export default function PuppyEdit() {
       name: puppy.name,
       sex: puppy.sex || '',
       color: puppy.color || '',
+      collarColor: puppy.collar_color || '',
+      markings: puppy.markings || '',
+      price: puppy.price != null ? String(puppy.price) : '',
+      status: puppy.status,
       litterAffix: puppy.litter_affix || '',
       regNo: puppy.reg_no || '',
       chipNo: puppy.chip_no || '',
@@ -51,6 +65,10 @@ export default function PuppyEdit() {
         name: form.name.trim(),
         sex: form.sex || null,
         color: form.color || null,
+        collar_color: form.collarColor || null,
+        markings: form.markings || null,
+        price: form.price.trim() === '' ? null : Number(form.price),
+        status: form.status,
         litter_affix: form.litterAffix || null,
         reg_no: form.regNo || null,
         chip_no: form.chipNo || null,
@@ -78,8 +96,18 @@ export default function PuppyEdit() {
             <option value="female">Female</option>
             <option value="male">Male</option>
           </Select>
-          <TextField label="Color" value={form.color} onChange={(e) => set('color', e.target.value)} />
+          <Select label="Status" value={form.status} onChange={(e) => set('status', e.target.value as PuppyStatus)}>
+            {STATUS_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </Select>
         </div>
+        <div className="grid grid-cols-2 gap-3">
+          <TextField label="Color" value={form.color} onChange={(e) => set('color', e.target.value)} />
+          <TextField label="Collar color" value={form.collarColor} onChange={(e) => set('collarColor', e.target.value)} />
+        </div>
+        <TextField label="Markings" value={form.markings} onChange={(e) => set('markings', e.target.value)} placeholder="e.g. white blaze, NBT" />
+        <TextField label="Price (€)" type="number" value={form.price} onChange={(e) => set('price', e.target.value)} />
         <TextField label="Litter affix" value={form.litterAffix} onChange={(e) => set('litterAffix', e.target.value)} />
         <div className="grid grid-cols-2 gap-3">
           <TextField label="Registration no." value={form.regNo} onChange={(e) => set('regNo', e.target.value)} />

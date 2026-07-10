@@ -49,6 +49,17 @@ export default function Docs() {
     });
   }
 
+  async function downloadUpload(pathInBucket: string) {
+    // space-files is private (RLS), so open through a short-lived signed URL.
+    const { data } = await supabase.storage.from('space-files').createSignedUrl(pathInBucket, 60);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+  }
+
+  async function deleteUpload(id: string, pathInBucket: string) {
+    await supabase.storage.from('space-files').remove([pathInBucket]);
+    await supabase.from('uploads').delete().eq('id', id);
+  }
+
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto">
       <PageHeader title="Documents" subtitle={litter?.name} />
@@ -117,9 +128,28 @@ export default function Docs() {
           ) : (
             <div className="flex flex-col gap-1.5">
               {litterUploads.map((u) => (
-                <Card key={u.id} className="p-3 flex items-center justify-between">
-                  <span className="text-[12.5px] font-bold truncate">{u.name}</span>
-                  <span className="text-[10.5px] text-faint font-semibold">{longDate(u.created_at.slice(0, 10))}</span>
+                <Card key={u.id} className="p-3 flex items-center justify-between gap-2">
+                  <button
+                    onClick={() => downloadUpload(u.file)}
+                    className="flex-1 min-w-0 text-left cursor-pointer"
+                    title="Download"
+                  >
+                    <div className="text-[12.5px] font-bold truncate text-accent">{u.name}</div>
+                    <div className="text-[10.5px] text-faint font-semibold">{longDate(u.created_at.slice(0, 10))}</div>
+                  </button>
+                  <button
+                    onClick={() => downloadUpload(u.file)}
+                    className="text-[11px] font-extrabold text-accent cursor-pointer px-2 py-1"
+                  >
+                    Download
+                  </button>
+                  <button
+                    onClick={() => { if (confirm(`Delete "${u.name}"?`)) deleteUpload(u.id, u.file); }}
+                    className="text-[15px] text-faint hover:text-danger cursor-pointer px-1"
+                    title="Delete"
+                  >
+                    ×
+                  </button>
                 </Card>
               ))}
             </div>

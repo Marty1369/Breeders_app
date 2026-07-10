@@ -10,6 +10,7 @@ const TYPE_LABEL: Record<HealthEntry['type'], string> = {
   vaccination: 'Vaccination',
   deworming: 'Deworming',
   vet_check: 'Vet check',
+  medication: 'Medication',
 };
 
 export default function HealthLog() {
