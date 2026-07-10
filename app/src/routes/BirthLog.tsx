@@ -11,7 +11,7 @@ function clockOf(iso: string | null): string {
 }
 
 export default function BirthLog() {
-  const { litters, activeLitterId, tasks, members, puppies, whelpingSessions, birthEvents } = useSpace();
+  const { litters, activeLitterId, tasks, members, puppies, whelpingSessions, birthEvents, recurrenceRules } = useSpace();
   const { user } = useAuth();
   const litter = litters.find((l) => l.id === activeLitterId);
   const [busy, setBusy] = useState(false);
@@ -47,7 +47,7 @@ export default function BirthLog() {
   };
   const finish = async () => {
     setBusy(true);
-    await finishWhelping(litter, tasks, members, birthEvents, user?.id);
+    await finishWhelping(litter, tasks, members, birthEvents, user?.id, recurrenceRules);
     setBusy(false);
   };
 

@@ -19,7 +19,7 @@ const KEYS: { key: DateKey; label: string }[] = [
 
 export default function LitterInfo() {
   const { id } = useParams<{ id: string }>();
-  const { litters, tasks, members, dogs } = useSpace();
+  const { litters, tasks, members, dogs, recurrenceRules } = useSpace();
   const { user } = useAuth();
   const litter = litters.find((l) => l.id === id);
   const [editingKey, setEditingKey] = useState<DateKey | null>(null);
@@ -53,7 +53,7 @@ export default function LitterInfo() {
   async function confirmApply() {
     if (!preview || !litter) return;
     setBusy(true);
-    await applyDateChange(litter, tasks, members, preview.newDates, user?.id);
+    await applyDateChange(litter, tasks, members, preview.newDates, user?.id, recurrenceRules);
     setBusy(false);
     setPreview(null);
     setEditingKey(null);

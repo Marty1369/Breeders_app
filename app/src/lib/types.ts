@@ -376,6 +376,12 @@ export interface RecurrenceRule {
   end_key: string | null;
   end_date: string | null;
   end_count: number | null;
+  // Re-anchoring (0011): key date + offset the start/end were derived from, so
+  // litter-scoped rules re-flow when the litter's dates change. null = fixed.
+  start_anchor: string | null;
+  start_offset: number | null;
+  end_anchor: string | null;
+  end_offset: number | null;
   assignee_ids: string[];
   paused: boolean;
   created_at: string;

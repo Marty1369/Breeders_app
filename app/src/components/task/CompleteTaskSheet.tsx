@@ -22,7 +22,7 @@ const CATS: { value: ExpenseCategory; label: string }[] = [
 ];
 
 export default function CompleteTaskSheet({ task, onClose }: { task: Task | null; onClose: () => void }) {
-  const { litters, tasks, members, payers, space } = useSpace();
+  const { litters, tasks, members, payers, space, recurrenceRules } = useSpace();
   const { user } = useAuth();
   const litter = litters.find((l) => l.id === task?.litter_id);
 
@@ -58,7 +58,7 @@ export default function CompleteTaskSheet({ task, onClose }: { task: Task | null
     else if (resultType === 'weight') resultLog = { type: 'weight', value, unit: 'g' };
     else if (resultType === 'note') resultLog = { type: 'note', value };
 
-    await completeTaskWithResult(task, resultLog, litter, tasks, members, user?.id);
+    await completeTaskWithResult(task, resultLog, litter, tasks, members, user?.id, recurrenceRules);
 
     if (attachExpense && space && expAmount) {
       await supabase.from('expenses').insert({

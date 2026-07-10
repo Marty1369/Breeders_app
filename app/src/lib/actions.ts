@@ -4,9 +4,10 @@
 import { supabase } from './supabase';
 import { applyCascade, cascadePreview, recomputeLitterDates, setActualDate } from './scheduling';
 import { scheduleUpdates } from './dependencies';
+import { reanchorRules } from './recurrence';
 import { fmt, todayStr } from './dates';
 import type { DateKey } from './scheduling';
-import type { BirthEvent, Litter, NotificationKind, Puppy, SpaceMember, Task } from './types';
+import type { BirthEvent, Litter, NotificationKind, Puppy, RecurrenceRule, SpaceMember, Task } from './types';
 
 /** Set/clear the completion state of a single recurring-rule occurrence. */
 export async function setOccurrence(
@@ -66,10 +67,15 @@ export async function applyDateChange(
   tasks: Task[],
   members: SpaceMember[],
   newDatesInput: ReturnType<typeof recomputeLitterDates>,
-  actorUserId?: string
+  actorUserId?: string,
+  rules: RecurrenceRule[] = []
 ) {
   const litterTasks = tasks.filter((t) => t.litter_id === litter.id);
   const shifts = applyCascade(litterTasks, newDatesInput);
+
+  // Re-anchor the litter's recurrence rules (weigh/box-temp/clean/socialization)
+  // to the new dates so the daily-care schedule follows the real whelping date.
+  const ruleShifts = reanchorRules(rules, litter.id, newDatesInput);
 
   // Apply anchor shifts to an in-memory copy, then re-flow task-to-task
   // dependencies topologically on top of the new anchor dates.
@@ -88,6 +94,9 @@ export async function applyDateChange(
   await supabase.from('litters').update({ dates: newDatesInput }).eq('id', litter.id);
   await Promise.all(
     all.map((s) => supabase.from('tasks').update({ start_date: s.start_date, due_date: s.due_date }).eq('id', s.id))
+  );
+  await Promise.all(
+    ruleShifts.map((r) => supabase.from('recurrence_rules').update({ start_date: r.start_date, end_date: r.end_date }).eq('id', r.id))
   );
 
   if (all.length) {
@@ -122,7 +131,8 @@ export async function completeTaskWithResult(
   litter: Litter | undefined,
   tasks: Task[],
   members: SpaceMember[],
-  actorUserId?: string
+  actorUserId?: string,
+  rules: RecurrenceRule[] = []
 ) {
   await supabase.from('tasks').update({ status: 'done', result_log: resultLog }).eq('id', task.id);
 
@@ -141,7 +151,7 @@ export async function completeTaskWithResult(
       // scheduled date (an off-schedule test would otherwise misdate the litter).
       const ovulationActual = resultLog.date || task.start_date;
       const newDates = recomputeLitterDates({ ...litter.dates, ovulation: { predicted: litter.dates.ovulation?.predicted ?? null, actual: ovulationActual } });
-      await applyDateChange(litter, tasks, members, newDates, actorUserId);
+      await applyDateChange(litter, tasks, members, newDates, actorUserId, rules);
       return { confirmedOvulation: true };
     }
   }
@@ -199,7 +209,8 @@ export async function finishWhelping(
   tasks: Task[],
   members: SpaceMember[],
   birthEvents: BirthEvent[],
-  actorUserId?: string
+  actorUserId?: string,
+  rules: RecurrenceRule[] = []
 ) {
   const litterBirths = birthEvents
     .filter((e) => e.litter_id === litter.id && e.type === 'born' && e.born_at)
@@ -214,5 +225,5 @@ export async function finishWhelping(
   }
 
   const newDates = setActualDate(litter.dates, 'whelping', birthDate);
-  await applyDateChange(litter, tasks, members, newDates, actorUserId);
+  await applyDateChange(litter, tasks, members, newDates, actorUserId, rules);
 }
