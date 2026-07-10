@@ -2,12 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { activeEnv } from '../lib/supabase';
-import { Avatar, Button } from '../components/ui';
+import { Avatar } from '../components/ui';
 import { niceDate, todayStr, diffDays } from '../lib/dates';
 import { effectiveDate } from '../lib/scheduling';
 import LitterSwitcherSheet from '../components/LitterSwitcherSheet';
 import TaskFormSheet from '../components/task/TaskFormSheet';
-import RuleFormSheet from '../components/RuleFormSheet';
 import Dashboard from './Dashboard';
 import Ongoing from './Ongoing';
 import Today from './Today';
@@ -68,7 +67,6 @@ export default function AppShell() {
   const [width, setWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [newTaskOpen, setNewTaskOpen] = useState(false);
-  const [newRepeatOpen, setNewRepeatOpen] = useState(false);
   const isDesktop = width >= 900;
   const { space, litters, activeLitterId, notifications, me } = useSpace();
   const navigate = useNavigate();
@@ -180,12 +178,6 @@ export default function AppShell() {
                 </span>
               )}
             </div>
-            {isDesktop && activeLitter && (
-              <>
-                <Button variant="secondary" size="sm" onClick={() => setNewRepeatOpen(true)} icon="⟳">New repeat</Button>
-                <Button size="sm" onClick={() => setNewTaskOpen(true)} icon="＋">New task</Button>
-              </>
-            )}
             <button onClick={() => navigate('/search')} className="w-9 h-9 rounded-full grid place-items-center hover:bg-muted-bg cursor-pointer text-[15px]">
               🔍
             </button>
@@ -258,7 +250,6 @@ export default function AppShell() {
 
       <LitterSwitcherSheet open={switcherOpen} onClose={() => setSwitcherOpen(false)} />
       <TaskFormSheet open={newTaskOpen} litterId={activeLitterId} onClose={() => setNewTaskOpen(false)} />
-      <RuleFormSheet open={newRepeatOpen} onClose={() => setNewRepeatOpen(false)} />
     </div>
   );
 }

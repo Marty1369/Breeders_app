@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { Button, Card, EmptyState } from '../components/ui';
-import { addDays, diffDays, niceDate, todayStr } from '../lib/dates';
+import { addDays, diffDays, niceDate, parseDate, todayStr } from '../lib/dates';
 import { effectiveDate, hasWeightAlert } from '../lib/scheduling';
 import { checkKey, occurrencesForDate } from '../lib/recurrence';
 import type { Dog, Puppy, RuleCheck } from '../lib/types';
@@ -254,8 +254,7 @@ function dogName(dogs: Dog[], id: string | null): string {
 }
 
 function dowLabel(date: string): string {
-  const d = new Date(date);
-  const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+  const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][parseDate(date).getDay()];
   return `${dow}, ${niceDate(date)}`;
 }
 

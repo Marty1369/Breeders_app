@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { Avatar, Chip, EmptyState, PageHeader, SegmentedControl } from '../components/ui';
-import { addDays, diffDays, longDate, todayStr } from '../lib/dates';
+import { addDays, diffDays, longDate, parseDate, todayStr } from '../lib/dates';
 import TaskDetailSheet from '../components/task/TaskDetailSheet';
 import CompleteTaskSheet from '../components/task/CompleteTaskSheet';
 import TaskFormSheet from '../components/task/TaskFormSheet';
@@ -48,8 +48,7 @@ export default function Timeline({ mode = 'both' }: { mode?: 'both' | 'list' | '
   const weeks = useMemo(() => {
     const map = new Map<string, Task[]>();
     for (const t of litterTasks) {
-      const d = new Date(t.start_date);
-      const day = d.getDay();
+      const day = parseDate(t.start_date).getDay();
       const monday = addDays(t.start_date, day === 0 ? -6 : 1 - day);
       if (!map.has(monday)) map.set(monday, []);
       map.get(monday)!.push(t);
