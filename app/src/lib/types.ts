@@ -171,7 +171,7 @@ export interface Task {
   comments: TaskComment[];
   checklist: { label: string; done: boolean }[];
   cost_expected: boolean;
-  result_log: { type: 'progesterone' | 'weight' | 'ultrasound' | 'note'; value: string; unit?: string } | null;
+  result_log: { type: 'progesterone' | 'weight' | 'ultrasound' | 'note'; value: string; unit?: string; date?: string } | null;
   created_at: string;
 }
 

@@ -133,10 +133,17 @@ export async function completeTaskWithResult(
     await supabase.from('litters').update({ status: 'pregnant' }).eq('id', litter.id);
   }
 
-  if (resultLog?.type === 'progesterone' && Number(resultLog.value) >= 18) {
-    const newDates = recomputeLitterDates({ ...litter.dates, ovulation: { predicted: litter.dates.ovulation?.predicted ?? null, actual: task.start_date } });
-    await applyDateChange(litter, tasks, members, newDates, actorUserId);
-    return { confirmedOvulation: true };
+  if (resultLog?.type === 'progesterone') {
+    // Normalise to nmol/L (1 ng/mL ≈ 3.18 nmol/L) for the ovulation threshold.
+    const nmol = resultLog.unit === 'ng/ml' ? Number(resultLog.value) * 3.18 : Number(resultLog.value);
+    if (nmol >= 18) {
+      // Anchor ovulation to the actual TEST date the user entered, not the task's
+      // scheduled date (an off-schedule test would otherwise misdate the litter).
+      const ovulationActual = resultLog.date || task.start_date;
+      const newDates = recomputeLitterDates({ ...litter.dates, ovulation: { predicted: litter.dates.ovulation?.predicted ?? null, actual: ovulationActual } });
+      await applyDateChange(litter, tasks, members, newDates, actorUserId);
+      return { confirmedOvulation: true };
+    }
   }
   return { confirmedOvulation: false };
 }

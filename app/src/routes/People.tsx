@@ -149,7 +149,7 @@ function FilterChip({ active, onClick, label }: { active: boolean; onClick: () =
   );
 }
 
-function AddOwnerSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function AddOwnerSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { space, activeLitterId } = useSpace();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');

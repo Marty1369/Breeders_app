@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
-import { Card, Chip, EmptyState, PageHeader } from '../components/ui';
+import { Button, Card, Chip, EmptyState, PageHeader } from '../components/ui';
 import { longDate } from '../lib/dates';
 import { DOC_TYPE_LABEL } from '../lib/documents';
+import { AddOwnerSheet } from './People';
 import type { DocStatus, ExpenseCategory } from '../lib/types';
 
 const CAT_LABEL: Record<ExpenseCategory, string> = {
@@ -55,12 +57,18 @@ export function AllDocuments() {
 export function AllBuyers() {
   const { owners, puppies, litters } = useSpace();
   const navigate = useNavigate();
+  const [addOpen, setAddOpen] = useState(false);
 
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto">
-      <PageHeader title="All buyers" subtitle="Across every litter" />
+      <PageHeader
+        title="All buyers"
+        subtitle="Across every litter"
+        action={<Button onClick={() => setAddOpen(true)}>＋ Add buyer</Button>}
+      />
+      <AddOwnerSheet open={addOpen} onClose={() => setAddOpen(false)} />
       {owners.length === 0 ? (
-        <EmptyState title="No buyers yet" subtitle="Add buyers from a litter's Buyers tab." />
+        <EmptyState title="No buyers yet" subtitle="Add a buyer with the button above, or from a litter's Buyers tab." />
       ) : (
         <div className="flex flex-col gap-1.5">
           {owners.map((o) => {

@@ -92,7 +92,6 @@ export default function PuppyProfile() {
         <Button variant="secondary" onClick={() => setHandoverOpen(true)}>
           {gateOk ? 'Handover checklist ✓' : 'Handover checklist'}
         </Button>
-        <Button variant="secondary" onClick={() => navigate(`/docs?puppy=${puppy.id}`)}>Generate contract</Button>
       </div>
 
       <HandoverChecklistSheet puppy={handoverOpen ? puppy : null} onClose={() => setHandoverOpen(false)} />

@@ -28,6 +28,8 @@ export default function CompleteTaskSheet({ task, onClose }: { task: Task | null
 
   const [resultType, setResultType] = useState<ResultType>('none');
   const [value, setValue] = useState('');
+  const [progUnit, setProgUnit] = useState<'nmol/l' | 'ng/ml'>('nmol/l');
+  const [testDate, setTestDate] = useState(todayStr());
   const [ultrasoundResult, setUltrasoundResult] = useState<'pregnant' | 'not_pregnant' | ''>('');
   const [attachExpense, setAttachExpense] = useState(false);
   const [expAmount, setExpAmount] = useState('');
@@ -51,7 +53,7 @@ export default function CompleteTaskSheet({ task, onClose }: { task: Task | null
     setBusy(true);
 
     let resultLog: Task['result_log'] = null;
-    if (resultType === 'progesterone') resultLog = { type: 'progesterone', value, unit: 'nmol/l' };
+    if (resultType === 'progesterone') resultLog = { type: 'progesterone', value, unit: progUnit, date: testDate };
     else if (resultType === 'ultrasound') resultLog = { type: 'ultrasound', value: ultrasoundResult || 'unknown' };
     else if (resultType === 'weight') resultLog = { type: 'weight', value, unit: 'g' };
     else if (resultType === 'note') resultLog = { type: 'note', value };
@@ -109,10 +111,17 @@ export default function CompleteTaskSheet({ task, onClose }: { task: Task | null
 
           {resultType === 'progesterone' && (
             <>
-              <TextField label="Value (nmol/l)" type="number" value={value} onChange={(e) => setValue(e.target.value)} />
-              {Number(value) >= 18 && (
+              <div className="grid grid-cols-2 gap-3">
+                <TextField label="Value" type="number" value={value} onChange={(e) => setValue(e.target.value)} />
+                <Select label="Unit" value={progUnit} onChange={(e) => setProgUnit(e.target.value as 'nmol/l' | 'ng/ml')}>
+                  <option value="nmol/l">nmol/L</option>
+                  <option value="ng/ml">ng/mL</option>
+                </Select>
+              </div>
+              <TextField label="Test date" type="date" value={testDate} onChange={(e) => setTestDate(e.target.value)} />
+              {(progUnit === 'ng/ml' ? Number(value) * 3.18 : Number(value)) >= 18 && (
                 <div className="text-[11.5px] font-bold text-accent bg-accent-soft rounded-[10px] px-3 py-2">
-                  ≥ 18 nmol/l confirms ovulation — saving will re-cascade dependent dates.
+                  ≥ 18 nmol/L (≈ 5.7 ng/mL) confirms ovulation on {testDate} — saving will re-cascade dependent dates.
                 </div>
               )}
             </>
