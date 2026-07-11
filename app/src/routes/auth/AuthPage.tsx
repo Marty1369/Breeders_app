@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { supabase, isProduction } from '../../lib/supabase';
 import { setPendingInvite } from '../../lib/invite';
 import { Button, Card, SegmentedControl, TextField } from '../../components/ui';
 
@@ -14,6 +14,7 @@ export default function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirmSent, setConfirmSent] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [testBusy, setTestBusy] = useState<'A' | 'B' | null>(null);
   const navigate = useNavigate();
 
   async function submit(e: React.FormEvent) {
@@ -47,6 +48,32 @@ export default function AuthPage() {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setBusy(false);
+    }
+  }
+
+  // QA helper (staging/preview/dev only — hidden on the production build).
+  // Mints a pre-confirmed throwaway account via the create-test-account edge
+  // function, then signs in and drops into the create-space wizard, so the
+  // onboarding flow can be re-tested without email confirmation.
+  async function createTestAccount(persona: 'A' | 'B') {
+    setError(null);
+    setTestBusy(persona);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('create-test-account', {
+        body: { persona },
+      });
+      if (fnError) throw fnError;
+      if (data?.error) throw new Error(data.error);
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
+      if (signInError) throw signInError;
+      navigate('/onboarding/create-space');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create a test account');
+    } finally {
+      setTestBusy(null);
     }
   }
 
@@ -126,6 +153,36 @@ export default function AuthPage() {
             <Link to="/forgot-password">Forgot password?</Link>
           </div>
         </Card>
+
+        {!isProduction && !confirmSent && (
+          <Card className="p-4 mt-4 border border-dashed border-accent/40 bg-accent-soft/40">
+            <div className="text-[10.5px] font-extrabold text-accent tracking-wide mb-1">
+              TESTING — STAGING ONLY
+            </div>
+            <div className="text-[11.5px] font-semibold text-muted mb-3">
+              Spin up a fresh, pre-confirmed account (no email needed) and jump straight into the
+              create-space flow.
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                className="flex-1"
+                disabled={testBusy !== null}
+                onClick={() => createTestAccount('A')}
+              >
+                {testBusy === 'A' ? 'Creating…' : 'Test account A'}
+              </Button>
+              <Button
+                variant="secondary"
+                className="flex-1"
+                disabled={testBusy !== null}
+                onClick={() => createTestAccount('B')}
+              >
+                {testBusy === 'B' ? 'Creating…' : 'Test account B'}
+              </Button>
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );
