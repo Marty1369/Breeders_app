@@ -11,6 +11,9 @@ export default function MyProfile() {
   const [prefs, setPrefs] = useState({ push: true, email: false, assignments: true, milestones: true, teammatesTasks: false });
   const [hydrated, setHydrated] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Hydrate once `me` loads, so a direct load doesn't Save blanks over the
   // real profile (name/phone/avatar/notif prefs).
@@ -35,6 +38,21 @@ export default function MyProfile() {
   async function signOut() {
     await supabase.auth.signOut();
   }
+
+  const deleteAccount = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    const { error } = await supabase.rpc('delete_account');
+    if (error) {
+      setDeleteError(error.message || 'Could not delete account. Try again.');
+      setDeleting(false);
+      return;
+    }
+    // The auth user is gone server-side; clearing the local session drops us
+    // back to the login screen (and, if this was the sole member, the space and
+    // all its data were deleted too).
+    await supabase.auth.signOut();
+  };
 
   return (
     <div className="p-4 sm:p-6 max-w-lg mx-auto">
@@ -90,6 +108,34 @@ export default function MyProfile() {
         <Button onClick={save} disabled={busy || !hydrated}>{busy ? 'Saving…' : 'Save'}</Button>
         <Button variant="ghost" onClick={signOut}>Sign out</Button>
       </div>
+
+      <Card className="p-4 mt-6 border border-[#b93a2e]/25">
+        <div className="text-[11px] font-extrabold text-[#b93a2e] tracking-wide mb-1">DANGER ZONE</div>
+        <p className="text-[12.5px] text-faint mb-3">
+          Permanently delete your account. If you're the only member of your space, the space and all
+          its litters, dogs, tasks and documents are deleted too. This can't be undone.
+        </p>
+        {deleteError && (
+          <p className="text-[12px] font-bold text-[#b93a2e] mb-2">{deleteError}</p>
+        )}
+        {!confirmingDelete ? (
+          <Button variant="danger" onClick={() => { setDeleteError(null); setConfirmingDelete(true); }}>
+            Delete account
+          </Button>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <span className="text-[12.5px] font-bold">Delete your account permanently?</span>
+            <div className="flex gap-2">
+              <Button variant="danger" onClick={deleteAccount} disabled={deleting}>
+                {deleting ? 'Deleting…' : 'Yes, delete my account'}
+              </Button>
+              <Button variant="ghost" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

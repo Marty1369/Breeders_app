@@ -1,16 +1,38 @@
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { PDFDocument, rgb } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 import { DOC_TYPE_LABEL, fieldDefsFor } from './documents';
 import type { DocumentRecord } from './types';
+// Standard PDF fonts (Helvetica) are WinAnsi-encoded and cannot render
+// Lithuanian glyphs (č/š/ž/ū/ą…). Embed Unicode TTFs instead — see CLAUDE.md
+// "known state" PDF Unicode bug. Fonts are emitted as separate hashed assets
+// and only fetched when a document is actually generated.
+import regularFontUrl from '../assets/fonts/NotoSans-Regular.ttf?url';
+import boldFontUrl from '../assets/fonts/NotoSans-Bold.ttf?url';
 
 const GREEN = rgb(0x17 / 255, 0x80 / 255, 0x5a / 255);
 const INK = rgb(0x19 / 255, 0x1c / 255, 0x1a / 255);
 const MUTED = rgb(0x6b / 255, 0x73 / 255, 0x70 / 255);
 
+// Fetch each font once and reuse the bytes across generations.
+let fontBytesCache: { regular: ArrayBuffer; bold: ArrayBuffer } | null = null;
+async function loadFontBytes() {
+  if (!fontBytesCache) {
+    const [regular, bold] = await Promise.all([
+      fetch(regularFontUrl).then((r) => r.arrayBuffer()),
+      fetch(boldFontUrl).then((r) => r.arrayBuffer()),
+    ]);
+    fontBytesCache = { regular, bold };
+  }
+  return fontBytesCache;
+}
+
 export async function generateDocumentPdf(doc: DocumentRecord): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
+  pdf.registerFontkit(fontkit);
   const page = pdf.addPage([595, 842]); // A4
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const regular = await pdf.embedFont(StandardFonts.Helvetica);
+  const fonts = await loadFontBytes();
+  const bold = await pdf.embedFont(fonts.bold, { subset: true });
+  const regular = await pdf.embedFont(fonts.regular, { subset: true });
 
   let y = 780;
 
