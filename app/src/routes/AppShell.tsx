@@ -46,7 +46,7 @@ const KENNEL_NAV = [
 const LITTER_NAV = [
   { to: '/gantt', label: 'Gantt', icon: '▦' },
   { to: '/tasks', label: 'Tasks', icon: '☰' },
-  { to: '/ongoing', label: 'Ongoing', icon: '⟳' },
+  { to: '/ongoing', label: 'Agenda', icon: '⟳' },
   { to: '/whelping', label: 'Whelping', icon: '🐣' },
   { to: '/weigh-in', label: 'Weigh-ins', icon: '∿' },
   { to: '/puppies', label: 'Puppies', icon: '❋' },

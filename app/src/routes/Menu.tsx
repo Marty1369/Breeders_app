@@ -12,7 +12,7 @@ const ITEMS = [
   { to: '/expenses', label: 'Expenses', icon: '€' },
   { to: '/buyers', label: 'Buyers', icon: '⌂' },
   { to: '/docs', label: 'Documents', icon: '▤' },
-  { to: '/ongoing', label: 'Ongoing tasks', icon: '⟳' },
+  { to: '/ongoing', label: 'Agenda', icon: '⟳' },
   { to: '/litters', label: 'Litters', icon: '▣' },
   { to: '/dogs', label: 'My dogs', icon: '↺' },
   { to: '/team', label: 'Team & invites', icon: '👥' },
