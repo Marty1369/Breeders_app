@@ -6,13 +6,9 @@ import { addDays, todayStr } from '../../lib/dates';
 import { effectiveDate } from '../../lib/scheduling';
 import type { AnchorKey } from '../../lib/scheduling';
 import type { Task, TaskPhase } from '../../lib/types';
+import { STAGE_ORDER, STAGE_LABEL } from '../../lib/stages';
 
-const PHASES: { value: TaskPhase; label: string }[] = [
-  { value: 'prewhelp', label: 'Pre-whelp' },
-  { value: 't1_birth', label: 'Birth (T1)' },
-  { value: 't2_wean', label: 'Weaning (T2)' },
-  { value: 't3_social', label: 'Socialization (T3)' },
-];
+const PHASES: { value: TaskPhase; label: string }[] = STAGE_ORDER.map((p) => ({ value: p, label: STAGE_LABEL[p] }));
 
 const ANCHORS: { value: AnchorKey; label: string }[] = [
   { value: 'heat', label: 'Heat start' },
@@ -179,7 +175,7 @@ export default function TaskFormSheet({
             onClick={() => setMode('anchor+offset')}
             className={`flex-1 py-2 rounded-[10px] border text-[12px] font-extrabold cursor-pointer ${mode === 'anchor+offset' ? 'border-accent bg-accent-soft text-accent' : 'border-border text-muted'}`}
           >
-            Anchor + offset
+            Linked to a date
           </button>
         </div>
 
@@ -187,7 +183,7 @@ export default function TaskFormSheet({
           <TextField label="Date" type="date" value={fixedDate} onChange={(e) => setFixedDate(e.target.value)} />
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            <Select label="Anchor" value={anchor} onChange={(e) => setAnchor(e.target.value as AnchorKey)}>
+            <Select label="Linked to" value={anchor} onChange={(e) => setAnchor(e.target.value as AnchorKey)}>
               {ANCHORS.map((a) => (
                 <option key={a.value} value={a.value}>{a.label}</option>
               ))}

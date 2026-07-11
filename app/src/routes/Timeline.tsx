@@ -1,41 +1,22 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
-import { Avatar, EmptyState, PageHeader, SegmentedControl } from '../components/ui';
+import { Avatar, CircleCheckbox, EmptyState, PageHeader, SegmentedControl } from '../components/ui';
 import { diffDays, longDate, niceDate, todayStr } from '../lib/dates';
 import { effectiveDate } from '../lib/scheduling';
+import { STAGE_ORDER, STAGE_LABEL, STAGE_SUB, STAGE_COLOR, birthFraming } from '../lib/stages';
 import TaskDetailSheet from '../components/task/TaskDetailSheet';
 import CompleteTaskSheet from '../components/task/CompleteTaskSheet';
 import TaskFormSheet from '../components/task/TaskFormSheet';
 import TaskViewToggle from '../components/TaskViewToggle';
 import type { Task, TaskPhase } from '../lib/types';
 
+// One taxonomy for every task surface lives in lib/stages.ts. The filter row
+// reuses those labels; "All" is prepended here.
 const PHASES: { value: TaskPhase | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
-  { value: 'prewhelp', label: 'Before birth' },
-  { value: 't1_birth', label: 'Wk 1–3' },
-  { value: 't2_wean', label: 'Wk 4–6' },
-  { value: 't3_social', label: 'Wk 7–9' },
+  ...STAGE_ORDER.map((p) => ({ value: p, label: STAGE_LABEL[p] })),
 ];
-
-// The real stages from the kennel sheet: before birth (IKI GIMDYMO), then the
-// after-birth period split into puppy-age thirds (PO GIMDYMO trimesters).
-const STAGE_ORDER: TaskPhase[] = ['prewhelp', 't1_birth', 't2_wean', 't3_social'];
-const STAGE: Record<TaskPhase, { label: string; icon: string; sub: string; color: string }> = {
-  prewhelp: { label: 'Before birth', icon: '🤰', sub: 'Mating → whelping', color: '#8a938e' },
-  t1_birth: { label: 'After birth · weeks 1–3', icon: '🐣', sub: 'Newborn & nursing', color: '#17805a' },
-  t2_wean: { label: 'After birth · weeks 4–6', icon: '🍼', sub: 'Weaning', color: '#4a6fa5' },
-  t3_social: { label: 'After birth · weeks 7–9', icon: '🐕', sub: 'Socialization & handover', color: '#b97324' },
-};
-
-/** Frame a task by the birth: "T–5 to birth" before, "Pup day 12 · wk 2" after. */
-function birthFraming(startDate: string, whelping: string | null): string {
-  if (!whelping) return '';
-  const d = diffDays(whelping, startDate);
-  if (d < 0) return `T‑${-d} to birth`;
-  if (d === 0) return 'Birth day';
-  return `Pup day ${d} · wk ${Math.floor((d - 1) / 7) + 1}`;
-}
 
 /** Relative-date chip: Today / in 3 days / 5d overdue / Jul 20. */
 function relDate(startDate: string, today: string, done: boolean): { label: string; tone: 'late' | 'soon' | 'muted' } {
@@ -138,22 +119,22 @@ export default function Timeline({ mode = 'both' }: { mode?: 'both' | 'list' | '
         ) : (
           <div className="flex flex-col gap-6">
             {stageGroups.map(({ phase, items, done }) => {
-              const s = STAGE[phase];
+              const color = STAGE_COLOR[phase];
               const pct = Math.round((done / items.length) * 100);
               return (
                 <div key={phase}>
                   <div className="flex items-center gap-2.5 mb-2">
-                    <span className="text-[17px] leading-none">{s.icon}</span>
+                    <span className="w-3 h-3 rounded-full flex-none" style={{ background: color }} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2">
-                        <span className="text-[13px] font-extrabold" style={{ color: s.color }}>{s.label}</span>
-                        <span className="text-[10.5px] text-faint font-semibold truncate">{s.sub}</span>
+                        <span className="text-[15px] font-extrabold" style={{ color }}>{STAGE_LABEL[phase]}</span>
+                        <span className="text-[12px] text-faint font-semibold truncate">{STAGE_SUB[phase]}</span>
                       </div>
-                      <div className="mt-1 h-[3px] rounded-full bg-chip-bg overflow-hidden">
-                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: s.color }} />
+                      <div className="mt-1 h-[4px] rounded-full bg-chip-bg overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
                       </div>
                     </div>
-                    <span className="text-[10.5px] font-extrabold text-faint tabular-nums flex-none">{done}/{items.length}</span>
+                    <span className="text-[12px] font-extrabold text-faint tabular-nums flex-none">{done}/{items.length}</span>
                   </div>
                   <div className="flex flex-col gap-1.5">
                     {items.map((t) => (
@@ -205,33 +186,34 @@ export default function Timeline({ mode = 'both' }: { mode?: 'both' | 'list' | '
     const assignees = members.filter((m) => task.assignee_ids.includes(m.user_id));
     const rel = relDate(task.start_date, today, done);
     const framing = birthFraming(task.start_date, whelping);
-    const stripe = done ? '#c9cec8' : rel.tone === 'late' ? '#c0392b' : rel.tone === 'soon' ? '#d1852a' : STAGE[task.phase].color;
+    const stripe = done ? '#c9cec8' : rel.tone === 'late' ? '#c0392b' : rel.tone === 'soon' ? '#d1852a' : STAGE_COLOR[task.phase];
     const relColor = rel.tone === 'late' ? 'text-danger' : rel.tone === 'soon' ? 'text-[#b7791b]' : 'text-faint';
     return (
       <div
         onClick={onOpen}
-        className="flex items-center gap-3 pl-3 pr-3 py-2.5 bg-card border border-card-border rounded-[12px] cursor-pointer hover:border-border-strong transition-colors"
+        className="flex items-center gap-3 pl-3 pr-3 py-3 min-h-[56px] bg-card border border-card-border rounded-[14px] cursor-pointer hover:border-border-strong transition-colors"
         style={{ boxShadow: 'inset 3px 0 0 0 ' + stripe }}
       >
-        <input
-          type="checkbox"
+        <CircleCheckbox
           checked={done}
-          onClick={(e) => e.stopPropagation()}
-          onChange={() => (done ? onOpen() : onComplete())}
-          className="w-[19px] h-[19px] flex-none accent-[#17805a]"
+          size={28}
+          onClick={(e) => {
+            e.stopPropagation();
+            done ? onOpen() : onComplete();
+          }}
           aria-label={done ? `Reopen ${task.name}` : `Complete ${task.name}`}
         />
         <div className="flex-1 min-w-0">
-          <div className={`text-[13px] font-bold truncate ${done ? 'line-through text-faint' : ''}`}>{task.name}</div>
-          <div className="flex items-center gap-1.5 mt-0.5 text-[10.5px] font-semibold flex-wrap">
+          <div className={`text-[15px] font-bold truncate ${done ? 'line-through text-faint' : ''}`}>{task.name}</div>
+          <div className="flex items-center gap-1.5 mt-0.5 text-[12px] font-semibold flex-wrap">
             <span className={relColor}>{rel.label}</span>
             {framing && <><span className="text-border-strong">·</span><span className="text-faint">{framing}</span></>}
-            {task.is_pinned_date && <span className="text-faint">· 📌</span>}
+            {task.is_pinned_date && <span className="text-faint">· pinned</span>}
           </div>
         </div>
         <div className="flex -space-x-1.5 flex-none">
           {assignees.slice(0, 3).map((m) => (
-            <Avatar key={m.user_id} name={m.name} color={m.avatar_color} size={22} />
+            <Avatar key={m.user_id} name={m.name} color={m.avatar_color} size={24} />
           ))}
         </div>
       </div>

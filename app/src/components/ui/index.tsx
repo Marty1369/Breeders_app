@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
+import { CheckIcon } from '../icons';
 
 // ---------------------------------------------------------------------------
 // Shared visual primitives. Kept in one file deliberately: they're small,
@@ -61,11 +62,11 @@ export function TextField({
 
   return (
     <label className="flex flex-col gap-1.5 text-left">
-      {label && <span className="text-[11px] font-extrabold text-muted tracking-wide">{label}</span>}
+      {label && <span className="text-[12px] font-extrabold text-muted">{label}</span>}
       <div className="relative flex">
         <input
           type={effectiveType}
-          className={`min-h-11 px-3 w-full rounded-[var(--radius-control)] border border-border bg-white text-[13.5px] font-semibold text-ink placeholder:text-faint placeholder:font-medium ${isPassword ? 'pr-10' : ''} ${className}`}
+          className={`min-h-11 px-3 w-full rounded-[var(--radius-control)] border border-border bg-white text-[15px] font-semibold text-ink placeholder:text-faint placeholder:font-medium ${isPassword ? 'pr-10' : ''} ${className}`}
           {...rest}
         />
         {isPassword && (
@@ -112,9 +113,9 @@ export function TextArea({
 }: { label?: string } & TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <label className="flex flex-col gap-1.5 text-left">
-      {label && <span className="text-[11px] font-extrabold text-muted tracking-wide">{label}</span>}
+      {label && <span className="text-[12px] font-extrabold text-muted">{label}</span>}
       <textarea
-        className={`min-h-20 px-3 py-2.5 rounded-[var(--radius-control)] border border-border bg-white text-[13.5px] font-semibold text-ink placeholder:text-faint placeholder:font-medium resize-y ${className}`}
+        className={`min-h-20 px-3 py-2.5 rounded-[var(--radius-control)] border border-border bg-white text-[15px] font-semibold text-ink placeholder:text-faint placeholder:font-medium resize-y ${className}`}
         {...rest}
       />
     </label>
@@ -129,9 +130,9 @@ export function Select({
 }: { label?: string; children: ReactNode } & SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <label className="flex flex-col gap-1.5 text-left">
-      {label && <span className="text-[11px] font-extrabold text-muted tracking-wide">{label}</span>}
+      {label && <span className="text-[12px] font-extrabold text-muted">{label}</span>}
       <select
-        className={`min-h-11 px-3 rounded-[var(--radius-control)] border border-border bg-white text-[13.5px] font-semibold text-ink ${className}`}
+        className={`min-h-11 px-3 rounded-[var(--radius-control)] border border-border bg-white text-[15px] font-semibold text-ink ${className}`}
         {...rest}
       >
         {children}
@@ -156,7 +157,7 @@ export function Chip({
     danger: 'bg-danger-soft text-danger',
   };
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10.5px] font-extrabold whitespace-nowrap ${tones[tone]} ${className}`}>
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11.5px] font-extrabold whitespace-nowrap ${tones[tone]} ${className}`}>
       {children}
     </span>
   );
@@ -181,6 +182,75 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
       </span>
       {label && <span className="text-[12px] font-bold">{label}</span>}
     </button>
+  );
+}
+
+/**
+ * Circle checkbox (spec §1.4): 30px, 2.5px #cfd4cf border; done = filled accent
+ * with a white check. `onClick` receives the event so callers can stopPropagation
+ * when the checkbox sits inside a tappable row.
+ */
+export function CircleCheckbox({
+  checked,
+  onClick,
+  size = 30,
+  className = '',
+  'aria-label': ariaLabel,
+}: {
+  checked: boolean;
+  onClick?: (e: React.MouseEvent) => void;
+  size?: number;
+  className?: string;
+  'aria-label'?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={checked}
+      aria-label={ariaLabel}
+      className={`flex-none grid place-items-center rounded-full cursor-pointer transition-colors ${className}`}
+      style={{
+        width: size,
+        height: size,
+        border: checked ? 'none' : '2.5px solid #cfd4cf',
+        background: checked ? 'var(--color-accent)' : 'transparent',
+        color: '#fff',
+      }}
+    >
+      {checked && <CheckIcon size={Math.round(size * 0.62)} strokeWidth={2.6} />}
+    </button>
+  );
+}
+
+/**
+ * Collar-ring identity (spec §5.2): white circle with a ring in the puppy's
+ * collar colour + initial letter. Shared across weigh-in, Puppies, whelping,
+ * and the desktop Home strip.
+ */
+export function CollarAvatar({
+  name,
+  collar,
+  size = 34,
+  ring,
+  className = '',
+}: {
+  name: string;
+  collar?: string | null;
+  size?: number;
+  ring?: number;
+  className?: string;
+}) {
+  const initial = (name?.trim()?.[0] || '?').toUpperCase();
+  const ringColor = collar || '#cfd4cf';
+  const r = ring ?? Math.max(3, Math.round(size * 0.11));
+  return (
+    <div
+      className={`flex-none rounded-full grid place-items-center font-extrabold text-ink bg-white ${className}`}
+      style={{ width: size, height: size, boxShadow: `inset 0 0 0 ${r}px ${ringColor}`, fontSize: Math.round(size * 0.4) }}
+    >
+      {initial}
+    </div>
   );
 }
 
@@ -285,8 +355,8 @@ export function PageHeader({ title, subtitle, action }: { title: string; subtitl
   return (
     <div className="flex items-center gap-3 mb-4">
       <div className="min-w-0 flex-1">
-        <div className="text-[19px] font-extrabold truncate">{title}</div>
-        {subtitle && <div className="text-[11.5px] text-faint font-semibold truncate">{subtitle}</div>}
+        <div className="text-[22px] font-extrabold truncate">{title}</div>
+        {subtitle && <div className="text-[12.5px] text-faint font-semibold truncate">{subtitle}</div>}
       </div>
       {action}
     </div>

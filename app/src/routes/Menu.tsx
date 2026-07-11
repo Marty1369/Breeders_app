@@ -2,22 +2,27 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
+import type { ReactNode } from 'react';
 import { Avatar, Card, PageHeader } from '../components/ui';
 import LitterSwitcherSheet from '../components/LitterSwitcherSheet';
+import {
+  HeartPulseIcon, ScaleIcon, CrossIcon, CoinsIcon, UsersIcon, FileIcon, RepeatIcon,
+  PawIcon, DogIcon, BellIcon, SettingsIcon,
+} from '../components/icons';
 
-const ITEMS = [
-  { to: '/whelping', label: 'Whelping birth log', icon: '🐣' },
-  { to: '/weigh-in', label: 'Weigh-ins', icon: '∿' },
-  { to: '/health-log', label: 'Health log', icon: '✚' },
-  { to: '/expenses', label: 'Expenses', icon: '€' },
-  { to: '/buyers', label: 'Buyers', icon: '⌂' },
-  { to: '/docs', label: 'Documents', icon: '▤' },
-  { to: '/ongoing', label: 'Agenda', icon: '⟳' },
-  { to: '/litters', label: 'Litters', icon: '▣' },
-  { to: '/dogs', label: 'My dogs', icon: '↺' },
-  { to: '/team', label: 'Team & invites', icon: '👥' },
-  { to: '/notifications', label: 'Notifications', icon: '🔔' },
-  { to: '/settings', label: 'Settings', icon: '⚙' },
+const ITEMS: { to: string; label: string; icon: ReactNode }[] = [
+  { to: '/whelping', label: 'Whelping', icon: <HeartPulseIcon /> },
+  { to: '/weigh-in', label: 'Weigh-ins', icon: <ScaleIcon /> },
+  { to: '/health-log', label: 'Health log', icon: <CrossIcon /> },
+  { to: '/expenses', label: 'Expenses', icon: <CoinsIcon /> },
+  { to: '/buyers', label: 'Buyers', icon: <UsersIcon /> },
+  { to: '/docs', label: 'Documents', icon: <FileIcon /> },
+  { to: '/ongoing', label: 'Agenda', icon: <RepeatIcon /> },
+  { to: '/litters', label: 'Litters', icon: <PawIcon /> },
+  { to: '/dogs', label: 'My dogs', icon: <DogIcon /> },
+  { to: '/team', label: 'Team & invites', icon: <UsersIcon /> },
+  { to: '/notifications', label: 'Notifications', icon: <BellIcon /> },
+  { to: '/settings', label: 'Settings', icon: <SettingsIcon /> },
 ];
 
 export default function Menu() {
@@ -45,7 +50,7 @@ export default function Menu() {
 
       <button onClick={() => setSwitcherOpen(true)} className="w-full text-left cursor-pointer">
         <Card className="p-3.5 mb-4">
-          <div className="text-[10px] font-extrabold text-faint tracking-wide">ACTIVE LITTER</div>
+          <div className="text-[10px] font-extrabold text-faint tracking-wide">You're looking at</div>
           <div className="text-[13.5px] font-extrabold mt-0.5">{activeLitter?.name || 'None selected'}</div>
           <div className="text-[11px] text-accent font-extrabold mt-1">Switch litter →</div>
         </Card>
@@ -55,8 +60,8 @@ export default function Menu() {
         {ITEMS.map((item) => (
           <Link key={item.to} to={item.to}>
             <Card className="p-3.5 flex items-center gap-3 cursor-pointer">
-              <span className="text-[16px] w-5 text-center">{item.icon}</span>
-              <span className="text-[13px] font-bold">{item.label}</span>
+              <span className="w-6 h-6 grid place-items-center text-accent flex-none">{item.icon}</span>
+              <span className="text-[15px] font-bold">{item.label}</span>
             </Card>
           </Link>
         ))}

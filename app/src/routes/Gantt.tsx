@@ -8,19 +8,12 @@ import TaskFormSheet from '../components/task/TaskFormSheet';
 import RuleFormSheet from '../components/RuleFormSheet';
 import TaskViewToggle from '../components/TaskViewToggle';
 import type { Task, TaskPhase } from '../lib/types';
+import { STAGE_LABEL as PHASE_LABEL, STAGE_COLOR as PHASE_COLOR, STAGE_ORDER as PHASE_ORDER } from '../lib/stages';
 
 const DAY_W = 20;
 const ROW_H = 28;
 const HEAD_H = 24;
 const NAME_W = 172;
-
-const PHASE_LABEL: Record<TaskPhase, string> = {
-  prewhelp: 'Pre-whelp', t1_birth: 'Birth (T1)', t2_wean: 'Weaning (T2)', t3_social: 'Socialization (T3)',
-};
-const PHASE_COLOR: Record<TaskPhase, string> = {
-  prewhelp: '#8a938e', t1_birth: '#17805a', t2_wean: '#4a6fa5', t3_social: '#b97324',
-};
-const PHASE_ORDER: TaskPhase[] = ['prewhelp', 't1_birth', 't2_wean', 't3_social'];
 
 const DONE_COLOR = '#c9cec8';
 const LATE_COLOR = '#c0392b';
@@ -239,8 +232,8 @@ function GanttChart({
           {entries.map((e, i) => {
             if (e.kind === 'phase') {
               return (
-                <div key={`p${i}`} className="absolute font-extrabold text-[10px] tracking-wide" style={{ left: 8, top: e.y + 6, color: PHASE_COLOR[e.phase] }}>
-                  {PHASE_LABEL[e.phase].toUpperCase()}
+                <div key={`p${i}`} className="absolute font-extrabold text-[11px]" style={{ left: 8, top: e.y + 6, color: PHASE_COLOR[e.phase] }}>
+                  {PHASE_LABEL[e.phase]}
                 </div>
               );
             }

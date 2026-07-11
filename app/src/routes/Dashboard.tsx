@@ -4,6 +4,7 @@ import { useSpace } from '../state/SpaceProvider';
 import { Button, Card, EmptyState } from '../components/ui';
 import { addDays, diffDays, niceDate, parseDate, todayStr } from '../lib/dates';
 import { effectiveDate, hasWeightAlert } from '../lib/scheduling';
+import { litterProgress } from '../lib/stages';
 import { checkKey, occurrencesForDate } from '../lib/recurrence';
 import type { Dog, Puppy, RuleCheck } from '../lib/types';
 
@@ -46,9 +47,7 @@ export default function Dashboard() {
   const heat = litter ? effectiveDate(litter.dates, 'heat') : null;
   const vaccine = whelping ? addDays(whelping, 49) : null;
 
-  const rawDay = whelping ? diffDays(whelping, today) : null;
-  const dayBig = rawDay == null ? '—' : rawDay < 0 ? `T–${Math.abs(rawDay)}` : `Day ${rawDay}`;
-  const daySub = rawDay != null && rawDay < 0 ? 'to whelping' : 'of 63';
+  const progress = litter ? litterProgress(litter, today) : null;
   let pct = 0;
   if (heat && handover) pct = Math.max(0, Math.min(100, (diffDays(heat, today) / (diffDays(heat, handover) || 1)) * 100));
 
@@ -127,9 +126,8 @@ export default function Dashboard() {
               <div className="text-[10px] font-extrabold tracking-wide opacity-75">
                 {litter.name.toUpperCase()} · {dogName(dogs, litter.dam_id)} × {dogName(dogs, litter.sire_id)}
               </div>
-              <div className="text-[24px] font-extrabold mt-1">
-                {dayBig} <span className="text-[13px] font-bold opacity-70">{daySub}</span>
-              </div>
+              <div className="text-[20px] font-extrabold mt-1 leading-tight">{progress?.headline}</div>
+              {progress?.detail && <div className="text-[12.5px] font-semibold opacity-80 mt-0.5">{progress.detail}</div>}
               <div className="mt-2.5 h-1.5 rounded-full bg-white/20 overflow-hidden">
                 <div className="h-full rounded-full" style={{ width: `${pct}%`, background: '#7fd4ae' }} />
               </div>
@@ -161,10 +159,10 @@ export default function Dashboard() {
             {/* Weight alert */}
             {alertPuppy && (
               <button className="rounded-[16px] p-4 text-left cursor-pointer bg-card border-[1.5px]" style={{ borderColor: '#e5c9a3' }} onClick={() => navigate('/weigh-in')}>
-                <div className="text-[10px] font-extrabold tracking-wide text-amber">⚠ WEIGHT ALERT</div>
-                <div className="text-[14px] font-extrabold mt-1">{alertPuppy.name} is not gaining weight</div>
-                <div className="text-[11px] text-faint font-semibold mt-0.5">Gain ≤ 5 g over 4 consecutive weigh-ins</div>
-                <span className="inline-block mt-2.5 px-3 py-1.5 rounded-full text-[11.5px] font-extrabold" style={{ background: '#fbeee0', color: '#b97324' }}>Open weigh-ins →</span>
+                <div className="text-[11px] font-extrabold tracking-wide text-amber">Needs a look</div>
+                <div className="text-[15px] font-extrabold mt-1">{alertPuppy.name} hasn't gained weight in 4 weigh-ins</div>
+                <div className="text-[12px] text-faint font-semibold mt-0.5">Worth a closer look today</div>
+                <span className="inline-block mt-2.5 px-3 py-1.5 rounded-full text-[12px] font-extrabold" style={{ background: '#fbeee0', color: '#b97324' }}>Open weigh-ins →</span>
               </button>
             )}
 

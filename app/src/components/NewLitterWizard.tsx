@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
 import { Button, Select, Sheet, TextField } from './ui';
-import { todayStr } from '../lib/dates';
-import { recomputeLitterDates, tasksFromTemplates } from '../lib/scheduling';
+import { todayStr, addDays, niceDate } from '../lib/dates';
+import { recomputeLitterDates, tasksFromTemplates, effectiveDate } from '../lib/scheduling';
 import { defaultRulesForLitter } from '../lib/recurrence';
 import DogFormSheet from './DogFormSheet';
 import type { Dog } from '../lib/types';
@@ -43,6 +43,21 @@ export default function NewLitterWizard({
   const [heatStart, setHeatStart] = useState(todayStr());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Live predicted plan from the heat date (pure — no writes). Same computation
+  // submit() uses, so the preview matches exactly what gets created.
+  const preview = useMemo(() => {
+    if (!heatStart) return null;
+    const dates = recomputeLitterDates({ heat: { predicted: null, actual: heatStart } });
+    const taskCount = tasksFromTemplates(taskTemplates, { id: 'preview', space_id: space?.id ?? '' }, dates).length;
+    return {
+      fertileStart: addDays(heatStart, 11),
+      fertileEnd: addDays(heatStart, 15),
+      whelping: effectiveDate(dates, 'whelping'),
+      handover: effectiveDate(dates, 'handover'),
+      taskCount,
+    };
+  }, [heatStart, taskTemplates, space?.id]);
 
   useEffect(() => {
     if (!open) return;
@@ -125,14 +140,14 @@ export default function NewLitterWizard({
       <div className="flex flex-col gap-3">
         <TextField label="Litter name" value={name} onChange={(e) => setName(e.target.value)} />
 
-        <Select label="Dam" value={damId} onChange={(e) => setDamId(e.target.value)} required>
-          <option value="" disabled>Select dam…</option>
+        <Select label="Mum (dam)" value={damId} onChange={(e) => setDamId(e.target.value)} required>
+          <option value="" disabled>Select mum…</option>
           {females.map((d) => (
             <option key={d.id} value={d.id}>{d.name}</option>
           ))}
         </Select>
 
-        <Select label="Sire" value={sireId} onChange={(e) => (e.target.value === '__new__' ? setAddSireOpen(true) : setSireId(e.target.value))}>
+        <Select label="Dad (sire)" value={sireId} onChange={(e) => (e.target.value === '__new__' ? setAddSireOpen(true) : setSireId(e.target.value))}>
           <option value="">Not decided yet</option>
           {males.map((d) => (
             <option key={d.id} value={d.id}>{d.name}{d.is_external ? ' (external)' : ''}</option>
@@ -142,10 +157,21 @@ export default function NewLitterWizard({
 
         <TextField label="Heat start date" type="date" value={heatStart} onChange={(e) => setHeatStart(e.target.value)} />
 
-        <div className="text-[11px] text-faint font-semibold bg-muted-bg rounded-[10px] px-3 py-2.5 leading-relaxed">
-          Ovulation, mating, whelping, weaning, and handover dates are predicted from this heat date using the
-          kennel's formulas. You can override any of them later — dependent tasks re-shift automatically.
-        </div>
+        {preview && (
+          <div className="rounded-[14px] p-4 text-white" style={{ background: '#123f2d' }}>
+            <div className="text-[10px] font-extrabold tracking-wider" style={{ color: '#7fd4ae' }}>HERE'S YOUR PREDICTED PLAN</div>
+            <div className="flex flex-col gap-1.5 mt-2 text-[13px] font-semibold">
+              <div>Best breeding days <span className="font-extrabold">{niceDate(preview.fertileStart)} – {niceDate(preview.fertileEnd)}</span></div>
+              {preview.whelping && <div>Puppies born around <span className="font-extrabold">{niceDate(preview.whelping)}</span></div>}
+              {preview.handover && <div>Puppies go home around <span className="font-extrabold">{niceDate(preview.handover)}</span></div>}
+            </div>
+            <div className="my-3 h-px bg-white/15" />
+            <div className="text-[12px] font-semibold leading-relaxed opacity-90">
+              <div><span style={{ color: '#7fd4ae' }}>✓</span> {preview.taskCount} tasks &amp; reminders will be planned for you</div>
+              <div>Dates shift automatically when real dates come in.</div>
+            </div>
+          </div>
+        )}
 
         {error && <div className="text-[12px] font-semibold text-danger">{error}</div>}
       </div>

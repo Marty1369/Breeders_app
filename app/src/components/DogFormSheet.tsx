@@ -112,7 +112,7 @@ export default function DogFormSheet({
       open={open}
       onClose={onClose}
       title={isEdit ? `Edit — ${dog?.name ?? ''}` : defaultSex === 'male' ? 'Add sire' : 'Add dog'}
-      subtitle={isEdit ? undefined : 'Dam, sire, or external stud'}
+      subtitle={isEdit ? undefined : 'Mum, dad, or external stud'}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
@@ -124,8 +124,8 @@ export default function DogFormSheet({
         <TextField label="Name" value={form.name} onChange={(e) => set('name', e.target.value)} autoFocus />
         <div className="grid grid-cols-2 gap-3">
           <Select label="Sex" value={form.sex} onChange={(e) => set('sex', e.target.value as 'female' | 'male')}>
-            <option value="female">Female (dam)</option>
-            <option value="male">Male (sire)</option>
+            <option value="female">Female (mum)</option>
+            <option value="male">Male (dad)</option>
           </Select>
           <TextField label="Breed" value={form.breed} onChange={(e) => set('breed', e.target.value)} />
         </div>

@@ -72,12 +72,12 @@ export default function BirthLog() {
             <div className="flex gap-3 mb-3">
               <Stat n={born.length} label="BORN" />
               <Stat n={stillborn.length} label="STILLBORN" />
-              <Stat n={retained} label="PLACENTAS DUE" tone={retained > 0 ? 'warn' : 'ok'} />
+              <Stat n={retained} label="PLACENTAS TO PASS" tone={retained > 0 ? 'warn' : 'ok'} />
             </div>
 
             {retained > 0 && (
-              <div className="mb-4 text-[11.5px] font-semibold rounded-[10px] px-3 py-2 bg-[#3a2a12] text-[#f2c879]">
-                {deliveries} delivered · {placentas} placenta{placentas === 1 ? '' : 's'} recorded · {retained} not yet passed. Watch for retained placenta.
+              <div className="mb-4 text-[12.5px] font-semibold rounded-[10px] px-3 py-2 bg-[#3a2a12] text-[#f2c879]">
+                {retained} placenta{retained === 1 ? " hasn't" : "s haven't"} passed yet — keep watching.
               </div>
             )}
 
