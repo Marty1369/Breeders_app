@@ -49,7 +49,9 @@ function barStyle(t: Task, phase: TaskPhase, today: string): { bg: string; opaci
   if (t.status === 'done') return { bg: DONE_COLOR, opacity: 0.75 };
   const due = t.due_date ?? t.start_date;
   if (due < today) return { bg: LATE_COLOR, opacity: 1 };
-  if (t.start_date <= addDays(today, 3) && due >= today) return { bg: SOON_COLOR, opacity: 1 };
+  // Due soon = the DUE date is within 3 days (not the start — a long task that
+  // began last week but is due next month is not "due soon").
+  if (due >= today && due <= addDays(today, 3)) return { bg: SOON_COLOR, opacity: 1 };
   return { bg: PHASE_COLOR[phase], opacity: 1 };
 }
 
@@ -61,6 +63,7 @@ export default function Gantt() {
   const [newTaskOpen, setNewTaskOpen] = useState(false);
   const [newRepeatOpen, setNewRepeatOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const scrolledFor = useRef<string | null>(null);
   const onOpen = (t: Task) => setDetailTask(t);
   const litter = litters.find((l) => l.id === activeLitterId);
   const today = todayStr();
@@ -98,11 +101,14 @@ export default function Gantt() {
     return { min, max, totalDays, entries, height: y, yByTask, xOf };
   }, [litterTasks]);
 
-  // Scroll the chart so today is in view when the litter (or its data) loads.
+  // Scroll to today once per litter (not on every realtime-driven layout rebuild,
+  // which would yank the user's scroll position back).
   useEffect(() => {
     if (!scrollRef.current || !layout) return;
+    if (scrolledFor.current === activeLitterId) return;
     const nowX = diffDays(layout.min, today) * DAY_W;
     scrollRef.current.scrollLeft = Math.max(0, NAME_W + nowX - 140);
+    scrolledFor.current = activeLitterId ?? null;
   }, [activeLitterId, layout, today]);
 
   if (!litter) return <div className="p-6"><EmptyState title="No litter selected" /></div>;

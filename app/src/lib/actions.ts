@@ -91,7 +91,8 @@ export async function applyDateChange(
   for (const s of depUpdates) merged.set(s.id, s);
   const all = [...merged.values()];
 
-  await supabase.from('litters').update({ dates: newDatesInput }).eq('id', litter.id);
+  const { error: litErr } = await supabase.from('litters').update({ dates: newDatesInput }).eq('id', litter.id);
+  if (litErr) throw litErr; // don't cascade tasks off dates that didn't persist
   await Promise.all(
     all.map((s) => supabase.from('tasks').update({ start_date: s.start_date, due_date: s.due_date }).eq('id', s.id))
   );
@@ -212,12 +213,19 @@ export async function finishWhelping(
   actorUserId?: string,
   rules: RecurrenceRule[] = []
 ) {
-  const litterBirths = birthEvents
-    .filter((e) => e.litter_id === litter.id && e.type === 'born' && e.born_at)
-    .sort((a, b) => (a.born_at! < b.born_at! ? -1 : 1));
-  // Use the LOCAL calendar date of the first live birth (not a UTC slice, which
-  // could roll an overnight birth to the wrong day).
-  const birthDate = litterBirths[0]?.born_at ? fmt(new Date(litterBirths[0].born_at!)) : todayStr();
+  // Read birth_events fresh — a just-tapped birth may not have arrived via
+  // realtime yet, and relying on the stale client cache would misdate whelping.
+  const { data: freshEvents } = await supabase
+    .from('birth_events')
+    .select('type, born_at')
+    .eq('litter_id', litter.id);
+  const events = freshEvents && freshEvents.length
+    ? freshEvents
+    : birthEvents.filter((e) => e.litter_id === litter.id);
+  // Earliest delivery of ANY type (an all-stillborn litter still has a birth date).
+  const withTime = events.filter((e) => e.born_at).sort((a, b) => (a.born_at! < b.born_at! ? -1 : 1));
+  // LOCAL calendar date (not a UTC slice, which could roll an overnight birth to the wrong day).
+  const birthDate = withTime[0]?.born_at ? fmt(new Date(withTime[0].born_at!)) : todayStr();
 
   await supabase.from('whelping_sessions').update({ ended_at: new Date().toISOString() }).eq('litter_id', litter.id);
   if (litter.status !== 'born') {

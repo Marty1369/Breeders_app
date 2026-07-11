@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSpace } from '../../state/SpaceProvider';
 import { useAuth } from '../../state/AuthProvider';
 import { supabase } from '../../lib/supabase';
@@ -42,11 +42,20 @@ export default function CompleteTaskSheet({ task, onClose }: { task: Task | null
   function reset() {
     setResultType('none');
     setValue('');
+    setProgUnit('nmol/l');
+    setTestDate(todayStr());
     setUltrasoundResult('');
     setAttachExpense(false);
     setExpAmount('');
     setExpDesc('');
   }
+
+  // Reset all result state whenever a different task is opened, so a prior
+  // test date / unit can't carry over and anchor ovulation to the wrong day.
+  useEffect(() => {
+    reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.id]);
 
   async function save() {
     if (!task) return;

@@ -30,8 +30,10 @@ export default function BirthLog() {
   const litterPuppies = puppies.filter((p) => p.litter_id === litter.id);
   const born = events.filter((e) => e.type === 'born');
   const stillborn = events.filter((e) => e.type === 'stillborn');
-  const placentas = born.filter((e) => e.placenta_passed === true).length;
-  const retained = born.length - placentas;
+  // Every delivery (live or stillborn) has a placenta to account for.
+  const deliveries = born.length + stillborn.length;
+  const placentas = events.filter((e) => e.placenta_passed === true).length;
+  const retained = deliveries - placentas;
   const started = !!session?.started_at;
   const finished = !!session?.ended_at;
 
@@ -75,7 +77,7 @@ export default function BirthLog() {
 
             {retained > 0 && (
               <div className="mb-4 text-[11.5px] font-semibold rounded-[10px] px-3 py-2 bg-[#3a2a12] text-[#f2c879]">
-                {born.length} born · {placentas} placenta{placentas === 1 ? '' : 's'} recorded · {retained} not yet passed. Watch for retained placenta.
+                {deliveries} delivered · {placentas} placenta{placentas === 1 ? '' : 's'} recorded · {retained} not yet passed. Watch for retained placenta.
               </div>
             )}
 

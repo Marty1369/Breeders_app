@@ -3,7 +3,7 @@ import { useSpace } from '../../state/SpaceProvider';
 import { useAuth } from '../../state/AuthProvider';
 import { supabase } from '../../lib/supabase';
 import { Avatar, Button, Chip, Sheet, TextField } from '../ui';
-import { longDate } from '../../lib/dates';
+import { longDate, todayStr } from '../../lib/dates';
 import { markTaskDone } from '../../lib/actions';
 import type { Task } from '../../lib/types';
 
@@ -38,7 +38,7 @@ export default function TaskDetailSheet({
   const dependents = tasks.filter((t) => t.depends_on?.some((d) => d.taskId === task.id));
 
   const assignees = members.filter((m) => task.assignee_ids.includes(m.user_id));
-  const overdue = task.status !== 'done' && task.due_date && task.due_date < new Date().toISOString().slice(0, 10);
+  const overdue = task.status !== 'done' && task.due_date && task.due_date < todayStr();
 
   async function addComment() {
     if (!comment.trim() || !user || !task) return;
