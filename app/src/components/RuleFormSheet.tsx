@@ -87,6 +87,12 @@ export default function RuleFormSheet({
       end_date: endType === 'date' ? endDate || null : null,
       end_count: endType === 'count' ? endCount : null,
       assignee_ids: assignees,
+      // A manually edited rule becomes fixed — drop the whelping anchor so a
+      // later litter-date change won't overwrite the dates the user just set.
+      start_anchor: null,
+      start_offset: null,
+      end_anchor: null,
+      end_offset: null,
     };
     if (editing && rule) {
       await supabase.from('recurrence_rules').update(payload).eq('id', rule.id);

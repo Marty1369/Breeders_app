@@ -43,6 +43,36 @@ export function ruleEndDate(rule: RecurrenceRule, litterDates: LitterDates | nul
   return null; // never
 }
 
+type KeyDate = Parameters<typeof effectiveDate>[1];
+
+/**
+ * Recompute start/end for a litter's anchored recurrence rules against new litter
+ * dates, so the daily-care schedule re-flows when whelping (etc.) moves. Returns
+ * only the rules whose dates actually changed.
+ */
+export function reanchorRules(
+  rules: RecurrenceRule[],
+  litterId: string,
+  newDates: LitterDates
+): Array<{ id: string; start_date: string; end_date: string | null }> {
+  const out: Array<{ id: string; start_date: string; end_date: string | null }> = [];
+  for (const r of rules) {
+    if (r.litter_id !== litterId || !r.start_anchor) continue;
+    const anchor = effectiveDate(newDates, r.start_anchor as KeyDate);
+    if (!anchor) continue;
+    const start_date = addDays(anchor, r.start_offset ?? 0);
+    let end_date = r.end_date;
+    if (r.end_type === 'date' && r.end_anchor) {
+      const ea = effectiveDate(newDates, r.end_anchor as KeyDate);
+      if (ea) end_date = addDays(ea, r.end_offset ?? 0);
+    }
+    if (start_date !== r.start_date || end_date !== r.end_date) {
+      out.push({ id: r.id, start_date, end_date });
+    }
+  }
+  return out;
+}
+
 export function ruleOccursOn(rule: RecurrenceRule, date: string, litterDates: LitterDates | null): boolean {
   if (date < rule.start_date) return false;
   const end = ruleEndDate(rule, litterDates);
@@ -137,24 +167,28 @@ export function defaultRulesForLitter(
       space_id: litter.space_id, litter_id: litter.id, name: 'Weigh puppies', scope: 'litter',
       freq: 'daily', interval: 1, times: ['08:00', '20:00'], start_date: whelping,
       end_type: 'keydate', end_key: 'weaning', end_date: null, end_count: null,
+      start_anchor: 'whelping', start_offset: 0, end_anchor: null, end_offset: null,
       assignee_ids: [], paused: false,
     },
     {
       space_id: litter.space_id, litter_id: litter.id, name: 'Whelping box temperature', scope: 'litter',
       freq: 'daily', interval: 1, times: ['08:00'], start_date: whelping,
       end_type: 'date', end_key: null, end_date: addDays(whelping, 21), end_count: null,
+      start_anchor: 'whelping', start_offset: 0, end_anchor: 'whelping', end_offset: 21,
       assignee_ids: [], paused: false,
     },
     {
       space_id: litter.space_id, litter_id: litter.id, name: 'Clean whelping box', scope: 'litter',
       freq: 'daily', interval: 1, times: ['20:00'], start_date: whelping,
       end_type: 'keydate', end_key: 'weaning', end_date: null, end_count: null,
+      start_anchor: 'whelping', start_offset: 0, end_anchor: null, end_offset: null,
       assignee_ids: [], paused: false,
     },
     {
       space_id: litter.space_id, litter_id: litter.id, name: 'Socialization — 15 min handling', scope: 'litter',
       freq: 'daily', interval: 1, times: ['12:00'], start_date: socialStart,
       end_type: 'keydate', end_key: 'handover', end_date: null, end_count: null,
+      start_anchor: 'whelping', start_offset: 21, end_anchor: null, end_offset: null,
       assignee_ids: [], paused: false,
     },
   ];

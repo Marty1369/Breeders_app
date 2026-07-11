@@ -23,6 +23,9 @@ export interface Space {
   name: string;
   kennel_name: string | null;
   affix: string | null;
+  club: string | null;
+  vmvt_no: string | null;
+  breeds: string[];
   breeder_name: string | null;
   breeder_address: string | null;
   breeder_phone: string | null;
@@ -73,9 +76,22 @@ export interface Dog {
   dob: string | null;
   reg_no: string | null;
   chip_no: string | null;
+  registry: string | null;
+  color: string | null;
+  tail: string | null;
+  eyes: string | null;
+  eyes_exam_date: string | null;
+  hips: string | null;
+  elbows: string | null;
+  dentition: string | null;
+  bite: string | null;
+  titles: string | null;
+  show_results: string | null;
+  working_tests: string | null;
+  faults: string | null;
+  genetics_notes: string | null;
   photos: string[];
   genetics: GeneticTest[];
-  hips: string | null;
   is_external: boolean;
   external_owner: { name: string; phone: string; city: string } | null;
   heats: { startedAt: string }[];
@@ -90,6 +106,7 @@ export interface Litter {
   code: string | null;
   name: string;
   letter: string | null;
+  breed: string | null;
   dam_id: string | null;
   sire_id: string | null;
   status: LitterStatus;
@@ -154,7 +171,7 @@ export interface Task {
   comments: TaskComment[];
   checklist: { label: string; done: boolean }[];
   cost_expected: boolean;
-  result_log: { type: 'progesterone' | 'weight' | 'ultrasound' | 'note'; value: string; unit?: string } | null;
+  result_log: { type: 'progesterone' | 'weight' | 'ultrasound' | 'note'; value: string; unit?: string; date?: string } | null;
   created_at: string;
 }
 
@@ -166,6 +183,10 @@ export interface Puppy {
   litter_affix: string | null;
   sex: 'male' | 'female' | null;
   color: string | null;
+  collar_color: string | null;
+  tail: string | null;
+  markings: string | null;
+  price: number | null;
   birth_date_time: string | null;
   birth_weight: number | null;
   chip_no: string | null;
@@ -196,6 +217,11 @@ export interface Owner {
   id: string;
   space_id: string;
   name: string;
+  first_name: string | null;
+  surname: string | null;
+  street: string | null;
+  city: string | null;
+  postal_code: string | null;
   address: string | null;
   phone: string | null;
   email: string | null;
@@ -214,9 +240,13 @@ export interface HealthEntry {
   id: string;
   space_id: string;
   litter_id: string;
-  type: 'vaccination' | 'deworming' | 'vet_check';
+  dog_id: string | null;
+  type: 'vaccination' | 'deworming' | 'vet_check' | 'medication';
   product: string | null;
+  dose: string | null;
+  route: string | null;
   date: string;
+  given_at: string | null;
   applies_to: 'all' | string[];
   by_user_id: string | null;
   created_at: string;
@@ -285,6 +315,47 @@ export interface Notification {
   created_at: string;
 }
 
+// --- Whelping (0008_kennel_data_model.sql, 0010_log_birth_rpc.sql) ---
+
+export type DeliveryMode = 'natural' | 'c_section' | 'mixed';
+
+export interface WhelpingSession {
+  id: string;
+  space_id: string;
+  litter_id: string;
+  mucus_plug_at: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  delivery_mode: DeliveryMode | null;
+  vet_attended: boolean;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface BirthEvent {
+  id: string;
+  space_id: string;
+  litter_id: string;
+  session_id: string | null;
+  puppy_id: string | null;
+  seq: number | null;
+  born_at: string | null;
+  type: 'born' | 'stillborn';
+  sex: 'male' | 'female' | null;
+  color: string | null;
+  weight_g: number | null;
+  markings: string | null;
+  dewclaws: string | null;
+  palate_ok: boolean | null;
+  presentation: string | null;
+  placenta_passed: boolean | null;
+  calcium_given: boolean | null;
+  collar_color: string | null;
+  photo: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
 // --- Recurrence (0002_recurrence.sql) ---
 
 export type RuleScope = 'kennel' | 'litter';
@@ -305,6 +376,12 @@ export interface RecurrenceRule {
   end_key: string | null;
   end_date: string | null;
   end_count: number | null;
+  // Re-anchoring (0011): key date + offset the start/end were derived from, so
+  // litter-scoped rules re-flow when the litter's dates change. null = fixed.
+  start_anchor: string | null;
+  start_offset: number | null;
+  end_anchor: string | null;
+  end_offset: number | null;
   assignee_ids: string[];
   paused: boolean;
   created_at: string;

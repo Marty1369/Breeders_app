@@ -6,10 +6,13 @@ import { Avatar, Card, PageHeader } from '../components/ui';
 import LitterSwitcherSheet from '../components/LitterSwitcherSheet';
 
 const ITEMS = [
+  { to: '/whelping', label: 'Whelping birth log', icon: '🐣' },
+  { to: '/weigh-in', label: 'Weigh-ins', icon: '∿' },
+  { to: '/health-log', label: 'Health log', icon: '✚' },
   { to: '/expenses', label: 'Expenses', icon: '€' },
   { to: '/buyers', label: 'Buyers', icon: '⌂' },
   { to: '/docs', label: 'Documents', icon: '▤' },
-  { to: '/ongoing', label: 'Ongoing tasks', icon: '⟳' },
+  { to: '/ongoing', label: 'Agenda', icon: '⟳' },
   { to: '/litters', label: 'Litters', icon: '▣' },
   { to: '/dogs', label: 'My dogs', icon: '↺' },
   { to: '/team', label: 'Team & invites', icon: '👥' },

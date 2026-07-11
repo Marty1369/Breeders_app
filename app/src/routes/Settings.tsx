@@ -8,6 +8,8 @@ export default function Settings() {
   const [form, setForm] = useState(() => ({
     kennelName: space?.kennel_name || '',
     affix: space?.affix || '',
+    club: space?.club || '',
+    vmvtNo: space?.vmvt_no || '',
     breederName: space?.breeder_name || '',
     breederAddress: space?.breeder_address || '',
     breederPhone: space?.breeder_phone || '',
@@ -31,6 +33,8 @@ export default function Settings() {
       .update({
         kennel_name: form.kennelName || null,
         affix: form.affix || null,
+        club: form.club || null,
+        vmvt_no: form.vmvtNo || null,
         breeder_name: form.breederName || null,
         breeder_address: form.breederAddress || null,
         breeder_phone: form.breederPhone || null,
@@ -55,6 +59,10 @@ export default function Settings() {
         <div className="flex flex-col gap-3">
           <TextField label="Kennel name" value={form.kennelName} onChange={(e) => set('kennelName', e.target.value)} />
           <TextField label="Affix" value={form.affix} onChange={(e) => set('affix', e.target.value)} />
+          <div className="grid grid-cols-2 gap-3">
+            <TextField label="Club" value={form.club} onChange={(e) => set('club', e.target.value)} placeholder="VŠMB" />
+            <TextField label="VMVT approval no." value={form.vmvtNo} onChange={(e) => set('vmvtNo', e.target.value)} placeholder="LT 77-13-282" />
+          </div>
           <TextField label="Breeder name" value={form.breederName} onChange={(e) => set('breederName', e.target.value)} />
           <TextField label="Breeder address" value={form.breederAddress} onChange={(e) => set('breederAddress', e.target.value)} />
           <div className="grid grid-cols-2 gap-3">

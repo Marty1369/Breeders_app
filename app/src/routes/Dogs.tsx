@@ -2,11 +2,12 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
-import { Button, Card, Chip, EmptyState, PageHeader, Select, Sheet, TextField } from '../components/ui';
-import { niceDate, todayStr } from '../lib/dates';
+import { Button, Card, Chip, EmptyState, PageHeader, Sheet, TextField } from '../components/ui';
+import { addDays, niceDate, todayStr } from '../lib/dates';
 import { nextHeatPredicted } from '../lib/scheduling';
 import type { Dog } from '../lib/types';
 import NewLitterWizard from '../components/NewLitterWizard';
+import DogFormSheet from '../components/DogFormSheet';
 
 function ageFromDob(dob: string | null): string | null {
   if (!dob) return null;
@@ -18,6 +19,7 @@ export default function Dogs() {
   const { space, dogs, litters } = useSpace();
   const [params, setParams] = useSearchParams();
   const [addOpen, setAddOpen] = useState(false);
+  const [editDog, setEditDog] = useState<Dog | null>(null);
   const [wizardDog, setWizardDog] = useState<Dog | null>(null);
   const [heatDog, setHeatDog] = useState<Dog | null>(null);
 
@@ -51,7 +53,7 @@ export default function Dogs() {
           {owned.length > 0 && (
             <div className="flex flex-col gap-2.5">
               {owned.map((d) => (
-                <DogCard key={d.id} dog={d} litterCount={litterCount(d.id)} onStartLitter={() => setWizardDog(d)} onLogHeat={() => setHeatDog(d)} />
+                <DogCard key={d.id} dog={d} litterCount={litterCount(d.id)} onStartLitter={() => setWizardDog(d)} onLogHeat={() => setHeatDog(d)} onEdit={() => setEditDog(d)} />
               ))}
             </div>
           )}
@@ -60,7 +62,7 @@ export default function Dogs() {
               <div className="text-[10px] font-extrabold tracking-wider text-faint mb-1.5 mt-2">EXTERNAL STUDS</div>
               <div className="flex flex-col gap-2.5">
                 {external.map((d) => (
-                  <DogCard key={d.id} dog={d} litterCount={litterCount(d.id)} onStartLitter={() => setWizardDog(d)} onLogHeat={() => setHeatDog(d)} />
+                  <DogCard key={d.id} dog={d} litterCount={litterCount(d.id)} onStartLitter={() => setWizardDog(d)} onLogHeat={() => setHeatDog(d)} onEdit={() => setEditDog(d)} />
                 ))}
               </div>
             </div>
@@ -68,7 +70,8 @@ export default function Dogs() {
         </div>
       )}
 
-      <AddDogSheet open={addOpen} onClose={() => setAddOpen(false)} />
+      <DogFormSheet open={addOpen} dog={null} litterCount={0} onClose={() => setAddOpen(false)} />
+      <DogFormSheet open={editDog !== null} dog={editDog} litterCount={editDog ? litterCount(editDog.id) : 0} onClose={() => setEditDog(null)} />
       <LogHeatSheet dog={heatDog} onClose={() => setHeatDog(null)} />
       <NewLitterWizard
         open={wizardOpen}
@@ -91,11 +94,13 @@ function DogCard({
   litterCount,
   onStartLitter,
   onLogHeat,
+  onEdit,
 }: {
   dog: Dog;
   litterCount: number;
   onStartLitter: () => void;
   onLogHeat: () => void;
+  onEdit: () => void;
 }) {
   const age = ageFromDob(dog.dob);
   return (
@@ -110,8 +115,12 @@ function DogCard({
           <div className="text-[11px] text-faint font-semibold mt-0.5">
             {[dog.breed, age, dog.reg_no].filter(Boolean).join(' · ') || '—'}
           </div>
+          {dog.titles && <div className="text-[11px] text-accent font-extrabold mt-0.5">{dog.titles}</div>}
         </div>
-        <div className="text-[11px] font-extrabold text-muted whitespace-nowrap">{litterCount} litter{litterCount === 1 ? '' : 's'}</div>
+        <div className="flex items-center gap-3">
+          <div className="text-[11px] font-extrabold text-muted whitespace-nowrap">{litterCount} litter{litterCount === 1 ? '' : 's'}</div>
+          <button onClick={onEdit} className="text-[11px] font-extrabold text-accent cursor-pointer">Edit</button>
+        </div>
       </div>
 
       {dog.sex === 'female' && !dog.is_external && (
@@ -145,84 +154,6 @@ function DogCard({
   );
 }
 
-function AddDogSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { space } = useSpace();
-  const [form, setForm] = useState({
-    name: '', sex: 'female' as 'female' | 'male', breed: '', dob: '', regNo: '', chipNo: '', hips: '',
-    isExternal: false, extName: '', extPhone: '', extCity: '',
-  });
-  const [busy, setBusy] = useState(false);
-
-  function set<K extends keyof typeof form>(k: K, v: typeof form[K]) {
-    setForm((f) => ({ ...f, [k]: v }));
-  }
-
-  async function save() {
-    if (!space || !form.name.trim()) return;
-    setBusy(true);
-    await supabase.from('dogs').insert({
-      space_id: space.id,
-      name: form.name.trim(),
-      sex: form.sex,
-      breed: form.breed || null,
-      dob: form.dob || null,
-      reg_no: form.regNo || null,
-      chip_no: form.chipNo || null,
-      hips: form.hips || null,
-      is_external: form.isExternal,
-      external_owner: form.isExternal ? { name: form.extName, phone: form.extPhone, city: form.extCity } : null,
-    });
-    setBusy(false);
-    setForm({ name: '', sex: 'female', breed: '', dob: '', regNo: '', chipNo: '', hips: '', isExternal: false, extName: '', extPhone: '', extCity: '' });
-    onClose();
-  }
-
-  return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      title="Add dog"
-      subtitle="Dam, sire, or external stud"
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={busy || !form.name.trim()}>{busy ? 'Saving…' : 'Save'}</Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-3">
-        <TextField label="Name" value={form.name} onChange={(e) => set('name', e.target.value)} autoFocus />
-        <Select label="Sex" value={form.sex} onChange={(e) => set('sex', e.target.value as 'female' | 'male')}>
-          <option value="female">Female (dam)</option>
-          <option value="male">Male (sire)</option>
-        </Select>
-        <div className="grid grid-cols-2 gap-3">
-          <TextField label="Breed" value={form.breed} onChange={(e) => set('breed', e.target.value)} />
-          <TextField label="Date of birth" type="date" value={form.dob} onChange={(e) => set('dob', e.target.value)} />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <TextField label="Registration no." value={form.regNo} onChange={(e) => set('regNo', e.target.value)} />
-          <TextField label="Chip no." value={form.chipNo} onChange={(e) => set('chipNo', e.target.value)} />
-        </div>
-        <TextField label="Hips" value={form.hips} onChange={(e) => set('hips', e.target.value)} placeholder="A" />
-        <label className="flex items-center gap-2 mt-1 cursor-pointer">
-          <input type="checkbox" checked={form.isExternal} onChange={(e) => set('isExternal', e.target.checked)} className="w-[18px] h-[18px] accent-[#17805a]" />
-          <span className="text-[12.5px] font-bold">This is a visiting/external stud</span>
-        </label>
-        {form.isExternal && (
-          <div className="flex flex-col gap-3 bg-app-bg border border-border-soft rounded-[10px] p-3">
-            <TextField label="Owner name" value={form.extName} onChange={(e) => set('extName', e.target.value)} />
-            <div className="grid grid-cols-2 gap-3">
-              <TextField label="Owner phone" value={form.extPhone} onChange={(e) => set('extPhone', e.target.value)} />
-              <TextField label="City" value={form.extCity} onChange={(e) => set('extCity', e.target.value)} />
-            </div>
-          </div>
-        )}
-      </div>
-    </Sheet>
-  );
-}
-
 function LogHeatSheet({ dog, onClose }: { dog: Dog | null; onClose: () => void }) {
   const [date, setDate] = useState(todayStr());
   const [busy, setBusy] = useState(false);
@@ -252,6 +183,22 @@ function LogHeatSheet({ dog, onClose }: { dog: Dog | null; onClose: () => void }
       }
     >
       <TextField label="Heat start date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+
+      {date && (
+        <div className="mt-3 bg-app-bg border border-border-soft rounded-[10px] p-3">
+          <div className="text-[10px] font-extrabold tracking-wider text-faint mb-2">PREDICTED FROM THIS HEAT</div>
+          <div className="flex flex-col gap-1.5 text-[12px] font-semibold">
+            <div className="flex justify-between"><span className="text-muted">Fertile window</span><span>{niceDate(addDays(date, 11))} – {niceDate(addDays(date, 15))}</span></div>
+            <div className="flex justify-between"><span className="text-muted">Optimal breeding (ovulation)</span><span className="text-accent font-extrabold">{niceDate(addDays(date, 13))}</span></div>
+            <div className="flex justify-between"><span className="text-muted">Second mating</span><span>{niceDate(addDays(date, 15))}</span></div>
+            <div className="flex justify-between"><span className="text-muted">Predicted whelping</span><span>{niceDate(addDays(date, 75))}</span></div>
+          </div>
+          <div className="text-[10.5px] text-faint font-semibold mt-2">
+            Confirm with a progesterone test around the fertile window — log it when you complete the progesterone task.
+          </div>
+        </div>
+      )}
+
       {dog && dog.heats.length > 0 && (
         <div className="mt-4">
           <div className="text-[10px] font-extrabold tracking-wider text-faint mb-1.5">HISTORY</div>

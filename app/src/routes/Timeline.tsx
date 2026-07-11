@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
-import { Avatar, Chip, EmptyState, PageHeader, SegmentedControl } from '../components/ui';
-import { addDays, diffDays, longDate, todayStr } from '../lib/dates';
+import { Avatar, EmptyState, PageHeader, SegmentedControl } from '../components/ui';
+import { diffDays, longDate, niceDate, todayStr } from '../lib/dates';
+import { effectiveDate } from '../lib/scheduling';
 import TaskDetailSheet from '../components/task/TaskDetailSheet';
 import CompleteTaskSheet from '../components/task/CompleteTaskSheet';
 import TaskFormSheet from '../components/task/TaskFormSheet';
@@ -11,18 +12,39 @@ import type { Task, TaskPhase } from '../lib/types';
 
 const PHASES: { value: TaskPhase | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
-  { value: 'prewhelp', label: 'Pre-whelp' },
-  { value: 't1_birth', label: 'Birth' },
-  { value: 't2_wean', label: 'Weaning' },
-  { value: 't3_social', label: 'Social' },
+  { value: 'prewhelp', label: 'Before birth' },
+  { value: 't1_birth', label: 'Wk 1–3' },
+  { value: 't2_wean', label: 'Wk 4–6' },
+  { value: 't3_social', label: 'Wk 7–9' },
 ];
 
-function weekLabel(startOfWeek: string, today: string) {
-  const d = diffDays(today, startOfWeek);
-  if (d >= -6 && d <= 0) return 'This week';
-  if (d > 0 && d <= 7) return 'Next week';
-  if (d < 0 && d >= -13) return 'Last week';
-  return longDate(startOfWeek).replace(/^\w+, /, '') + ' week';
+// The real stages from the kennel sheet: before birth (IKI GIMDYMO), then the
+// after-birth period split into puppy-age thirds (PO GIMDYMO trimesters).
+const STAGE_ORDER: TaskPhase[] = ['prewhelp', 't1_birth', 't2_wean', 't3_social'];
+const STAGE: Record<TaskPhase, { label: string; icon: string; sub: string; color: string }> = {
+  prewhelp: { label: 'Before birth', icon: '🤰', sub: 'Mating → whelping', color: '#8a938e' },
+  t1_birth: { label: 'After birth · weeks 1–3', icon: '🐣', sub: 'Newborn & nursing', color: '#17805a' },
+  t2_wean: { label: 'After birth · weeks 4–6', icon: '🍼', sub: 'Weaning', color: '#4a6fa5' },
+  t3_social: { label: 'After birth · weeks 7–9', icon: '🐕', sub: 'Socialization & handover', color: '#b97324' },
+};
+
+/** Frame a task by the birth: "T–5 to birth" before, "Pup day 12 · wk 2" after. */
+function birthFraming(startDate: string, whelping: string | null): string {
+  if (!whelping) return '';
+  const d = diffDays(whelping, startDate);
+  if (d < 0) return `T‑${-d} to birth`;
+  if (d === 0) return 'Birth day';
+  return `Pup day ${d} · wk ${Math.floor((d - 1) / 7) + 1}`;
+}
+
+/** Relative-date chip: Today / in 3 days / 5d overdue / Jul 20. */
+function relDate(startDate: string, today: string, done: boolean): { label: string; tone: 'late' | 'soon' | 'muted' } {
+  const d = diffDays(today, startDate);
+  if (!done && d < 0) return { label: `${-d}d overdue`, tone: 'late' };
+  if (d === 0) return { label: 'Today', tone: 'soon' };
+  if (d === 1) return { label: 'Tomorrow', tone: 'soon' };
+  if (d > 1 && d <= 6) return { label: `in ${d} days`, tone: d <= 3 ? 'soon' : 'muted' };
+  return { label: niceDate(startDate), tone: 'muted' };
 }
 
 export default function Timeline({ mode = 'both' }: { mode?: 'both' | 'list' | 'calendar' }) {
@@ -44,22 +66,18 @@ export default function Timeline({ mode = 'both' }: { mode?: 'both' | 'list' | '
   );
 
   const today = todayStr();
+  const whelping = litter ? effectiveDate(litter.dates, 'whelping') : null;
 
-  const weeks = useMemo(() => {
-    const map = new Map<string, Task[]>();
-    for (const t of litterTasks) {
-      const d = new Date(t.start_date);
-      const day = d.getDay();
-      const monday = addDays(t.start_date, day === 0 ? -6 : 1 - day);
-      if (!map.has(monday)) map.set(monday, []);
-      map.get(monday)!.push(t);
-    }
-    return Array.from(map.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([weekStart, items]) => ({
-        weekStart,
-        items: items.sort((a, b) => a.start_date.localeCompare(b.start_date)),
-      }));
+  // Group by stage (before birth / after-birth thirds) — the kennel's own model.
+  const stageGroups = useMemo(() => {
+    return STAGE_ORDER.map((phase) => {
+      const items = litterTasks
+        .filter((t) => t.phase === phase)
+        .sort((a, b) => a.start_date.localeCompare(b.start_date));
+      const done = items.filter((t) => t.status === 'done').length;
+      const nextIdx = items.findIndex((t) => t.status !== 'done');
+      return { phase, items, done, nextIdx };
+    }).filter((g) => g.items.length > 0);
   }, [litterTasks]);
 
   function closeSheets() {
@@ -116,19 +134,35 @@ export default function Timeline({ mode = 'both' }: { mode?: 'both' | 'list' | '
 
       {effectiveView === 'list' ? (
         litterTasks.length === 0 ? (
-          <EmptyState title="No tasks in this phase" />
+          <EmptyState title="No tasks in this stage" />
         ) : (
-          <div className="flex flex-col gap-5">
-            {weeks.map(({ weekStart, items }) => (
-              <div key={weekStart}>
-                <div className="text-[10.5px] font-extrabold tracking-wider text-faint mb-1.5">{weekLabel(weekStart, today).toUpperCase()}</div>
-                <div className="flex flex-col gap-1.5">
-                  {items.map((t) => (
-                    <TaskRow key={t.id} task={t} onOpen={() => setDetailTask(t)} onComplete={() => setCompleteTask(t)} />
-                  ))}
+          <div className="flex flex-col gap-6">
+            {stageGroups.map(({ phase, items, done }) => {
+              const s = STAGE[phase];
+              const pct = Math.round((done / items.length) * 100);
+              return (
+                <div key={phase}>
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <span className="text-[17px] leading-none">{s.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-[13px] font-extrabold" style={{ color: s.color }}>{s.label}</span>
+                        <span className="text-[10.5px] text-faint font-semibold truncate">{s.sub}</span>
+                      </div>
+                      <div className="mt-1 h-[3px] rounded-full bg-chip-bg overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: s.color }} />
+                      </div>
+                    </div>
+                    <span className="text-[10.5px] font-extrabold text-faint tabular-nums flex-none">{done}/{items.length}</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {items.map((t) => (
+                      <TaskRow key={t.id} task={t} onOpen={() => setDetailTask(t)} onComplete={() => setCompleteTask(t)} />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )
       ) : (
@@ -167,28 +201,34 @@ export default function Timeline({ mode = 'both' }: { mode?: 'both' | 'list' | '
   );
 
   function TaskRow({ task, onOpen, onComplete }: { task: Task; onOpen: () => void; onComplete: () => void }) {
-    const overdue = task.status !== 'done' && task.start_date < today;
+    const done = task.status === 'done';
     const assignees = members.filter((m) => task.assignee_ids.includes(m.user_id));
+    const rel = relDate(task.start_date, today, done);
+    const framing = birthFraming(task.start_date, whelping);
+    const stripe = done ? '#c9cec8' : rel.tone === 'late' ? '#c0392b' : rel.tone === 'soon' ? '#d1852a' : STAGE[task.phase].color;
+    const relColor = rel.tone === 'late' ? 'text-danger' : rel.tone === 'soon' ? 'text-[#b7791b]' : 'text-faint';
     return (
       <div
         onClick={onOpen}
-        className="flex items-center gap-2.5 px-3 py-2.5 bg-card border border-card-border rounded-[12px] cursor-pointer"
+        className="flex items-center gap-3 pl-3 pr-3 py-2.5 bg-card border border-card-border rounded-[12px] cursor-pointer hover:border-border-strong transition-colors"
+        style={{ boxShadow: 'inset 3px 0 0 0 ' + stripe }}
       >
         <input
           type="checkbox"
-          checked={task.status === 'done'}
+          checked={done}
           onClick={(e) => e.stopPropagation()}
-          onChange={() => (task.status === 'done' ? onOpen() : onComplete())}
+          onChange={() => (done ? onOpen() : onComplete())}
           className="w-[19px] h-[19px] flex-none accent-[#17805a]"
+          aria-label={done ? `Reopen ${task.name}` : `Complete ${task.name}`}
         />
         <div className="flex-1 min-w-0">
-          <div className={`text-[13px] font-bold truncate ${task.status === 'done' ? 'line-through text-faint' : ''}`}>{task.name}</div>
-          <div className="text-[10.5px] text-faint font-semibold mt-0.5">
-            {longDate(task.start_date)}
-            {task.is_pinned_date && ' · 📌 pinned'}
+          <div className={`text-[13px] font-bold truncate ${done ? 'line-through text-faint' : ''}`}>{task.name}</div>
+          <div className="flex items-center gap-1.5 mt-0.5 text-[10.5px] font-semibold flex-wrap">
+            <span className={relColor}>{rel.label}</span>
+            {framing && <><span className="text-border-strong">·</span><span className="text-faint">{framing}</span></>}
+            {task.is_pinned_date && <span className="text-faint">· 📌</span>}
           </div>
         </div>
-        {overdue && <Chip tone="danger">Overdue</Chip>}
         <div className="flex -space-x-1.5 flex-none">
           {assignees.slice(0, 3).map((m) => (
             <Avatar key={m.user_id} name={m.name} color={m.avatar_color} size={22} />

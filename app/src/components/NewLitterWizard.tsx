@@ -6,6 +6,7 @@ import { Button, Select, Sheet, TextField } from './ui';
 import { todayStr } from '../lib/dates';
 import { recomputeLitterDates, tasksFromTemplates } from '../lib/scheduling';
 import { defaultRulesForLitter } from '../lib/recurrence';
+import DogFormSheet from './DogFormSheet';
 import type { Dog } from '../lib/types';
 
 function nextLetter(existing: string[]): string {
@@ -37,11 +38,7 @@ export default function NewLitterWizard({
 
   const [damId, setDamId] = useState('');
   const [sireId, setSireId] = useState('');
-  const [addingStud, setAddingStud] = useState(false);
-  const [studName, setStudName] = useState('');
-  const [studOwner, setStudOwner] = useState('');
-  const [studPhone, setStudPhone] = useState('');
-  const [studCity, setStudCity] = useState('');
+  const [addSireOpen, setAddSireOpen] = useState(false);
   const [name, setName] = useState(`Litter ${letter}`);
   const [heatStart, setHeatStart] = useState(todayStr());
   const [busy, setBusy] = useState(false);
@@ -53,7 +50,6 @@ export default function NewLitterWizard({
     setSireId(prefillSire?.id || '');
     setName(`Litter ${letter}`);
     setHeatStart(todayStr());
-    setAddingStud(false);
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -63,23 +59,7 @@ export default function NewLitterWizard({
     setBusy(true);
     setError(null);
     try {
-      let finalSireId = sireId || null;
-      if (addingStud) {
-        if (!studName.trim()) throw new Error('Enter the stud\'s name');
-        const { data, error: err } = await supabase
-          .from('dogs')
-          .insert({
-            space_id: space.id,
-            name: studName.trim(),
-            sex: 'male',
-            is_external: true,
-            external_owner: { name: studOwner, phone: studPhone, city: studCity },
-          })
-          .select('id')
-          .single();
-        if (err) throw err;
-        finalSireId = data.id;
-      }
+      const finalSireId = sireId || null;
 
       const dates = recomputeLitterDates({ heat: { predicted: null, actual: heatStart } });
 
@@ -129,6 +109,7 @@ export default function NewLitterWizard({
   }
 
   return (
+    <>
     <Sheet
       open={open}
       onClose={onClose}
@@ -151,28 +132,13 @@ export default function NewLitterWizard({
           ))}
         </Select>
 
-        {!addingStud ? (
-          <Select label="Sire" value={sireId} onChange={(e) => (e.target.value === '__new__' ? setAddingStud(true) : setSireId(e.target.value))}>
-            <option value="">Not decided yet</option>
-            {males.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}{d.is_external ? ' (external)' : ''}</option>
-            ))}
-            <option value="__new__">＋ Add external stud…</option>
-          </Select>
-        ) : (
-          <div className="flex flex-col gap-3 bg-app-bg border border-border-soft rounded-[10px] p-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-extrabold text-muted">EXTERNAL STUD</span>
-              <button onClick={() => setAddingStud(false)} className="text-[11px] font-extrabold text-accent cursor-pointer">Use existing instead</button>
-            </div>
-            <TextField label="Stud name" value={studName} onChange={(e) => setStudName(e.target.value)} />
-            <TextField label="Owner name" value={studOwner} onChange={(e) => setStudOwner(e.target.value)} />
-            <div className="grid grid-cols-2 gap-3">
-              <TextField label="Owner phone" value={studPhone} onChange={(e) => setStudPhone(e.target.value)} />
-              <TextField label="City" value={studCity} onChange={(e) => setStudCity(e.target.value)} />
-            </div>
-          </div>
-        )}
+        <Select label="Sire" value={sireId} onChange={(e) => (e.target.value === '__new__' ? setAddSireOpen(true) : setSireId(e.target.value))}>
+          <option value="">Not decided yet</option>
+          {males.map((d) => (
+            <option key={d.id} value={d.id}>{d.name}{d.is_external ? ' (external)' : ''}</option>
+          ))}
+          <option value="__new__">＋ Add new sire…</option>
+        </Select>
 
         <TextField label="Heat start date" type="date" value={heatStart} onChange={(e) => setHeatStart(e.target.value)} />
 
@@ -184,5 +150,15 @@ export default function NewLitterWizard({
         {error && <div className="text-[12px] font-semibold text-danger">{error}</div>}
       </div>
     </Sheet>
+
+    <DogFormSheet
+      open={addSireOpen}
+      dog={null}
+      litterCount={0}
+      defaultSex="male"
+      onCreated={(id) => setSireId(id)}
+      onClose={() => setAddSireOpen(false)}
+    />
+    </>
   );
 }

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
@@ -19,20 +20,47 @@ export default function Litters() {
   const { litters, dogs, tasks, puppies, activeLitterId, setActiveLitterId } = useSpace();
   const navigate = useNavigate();
 
+  // Optimistic active-state so the toggle responds instantly instead of waiting
+  // for the realtime round-trip. Cleared per-litter once the server value catches up.
+  const [pending, setPending] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    setPending((p) => {
+      let changed = false;
+      const next = { ...p };
+      for (const l of litters) {
+        if (l.id in next && next[l.id] === l.is_active) {
+          delete next[l.id];
+          changed = true;
+        }
+      }
+      return changed ? next : p;
+    });
+  }, [litters]);
+  const isActive = (l: Litter) => pending[l.id] ?? l.is_active;
+
   const dogName = (id: string | null) => dogs.find((d: Dog) => d.id === id)?.name ?? '—';
 
-  const activeLitters = litters.filter((l) => l.is_active && !isTerminal(l));
+  const activeLitters = litters.filter((l) => isActive(l) && !isTerminal(l));
   const groups: { title: string; hint?: string; items: Litter[] }[] = [
     { title: 'Active', hint: 'Shown on the dashboard and switcher', items: activeLitters },
-    { title: 'Inactive', hint: 'Shelved — kept, but out of the way', items: litters.filter((l) => !l.is_active && !isTerminal(l)) },
+    { title: 'Inactive', hint: 'Shelved — kept, but out of the way', items: litters.filter((l) => !isActive(l) && !isTerminal(l)) },
     { title: 'Archive', hint: 'Closed or did-not-take', items: litters.filter(isTerminal) },
   ];
 
   async function setActive(litter: Litter, active: boolean) {
-    await supabase.from('litters').update({ is_active: active }).eq('id', litter.id);
+    setPending((p) => ({ ...p, [litter.id]: active })); // instant feedback
+    const { error } = await supabase.from('litters').update({ is_active: active }).eq('id', litter.id);
+    if (error) {
+      setPending((p) => {
+        const next = { ...p };
+        delete next[litter.id];
+        return next;
+      });
+      return;
+    }
     if (!active && litter.id === activeLitterId) {
       // deactivating the current litter → hand focus to another active one
-      const next = activeLitters.find((l) => l.id !== litter.id);
+      const next = litters.find((l) => l.id !== litter.id && isActive(l) && !isTerminal(l));
       setActiveLitterId(next?.id ?? null);
     }
     if (active && !activeLitterId) setActiveLitterId(litter.id);
@@ -63,7 +91,7 @@ export default function Litters() {
                       const terminal = isTerminal(l);
                       const isCurrent = l.id === activeLitterId;
                       return (
-                        <Card key={l.id} className={`p-4 ${l.is_active || terminal ? '' : 'opacity-70'}`}>
+                        <Card key={l.id} className={`p-4 ${isActive(l) || terminal ? '' : 'opacity-70'}`}>
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
@@ -75,8 +103,8 @@ export default function Litters() {
                             </div>
                             {!terminal && (
                               <div className="flex flex-col items-end gap-1 flex-none">
-                                <Toggle checked={l.is_active} onChange={(v) => setActive(l, v)} />
-                                <span className="text-[9.5px] font-extrabold text-faint">{l.is_active ? 'ACTIVE' : 'INACTIVE'}</span>
+                                <Toggle checked={isActive(l)} onChange={(v) => setActive(l, v)} />
+                                <span className="text-[9.5px] font-extrabold text-faint">{isActive(l) ? 'ACTIVE' : 'INACTIVE'}</span>
                               </div>
                             )}
                           </div>
@@ -85,10 +113,10 @@ export default function Litters() {
                             {' · '}{nPups} pup{nPups === 1 ? '' : 's'} · {nTasks} open task{nTasks === 1 ? '' : 's'}
                           </div>
                           <div className="flex gap-2 mt-3">
-                            {l.is_active && !isCurrent && (
+                            {isActive(l) && !isCurrent && (
                               <Button variant="secondary" size="sm" onClick={() => setActiveLitterId(l.id)}>Set as current</Button>
                             )}
-                            <Button variant="ghost" size="sm" onClick={() => { if (l.is_active) setActiveLitterId(l.id); navigate(`/litters/${l.id}`); }}>Open dates & tasks →</Button>
+                            <Button variant="ghost" size="sm" onClick={() => { if (isActive(l)) setActiveLitterId(l.id); navigate(`/litters/${l.id}`); }}>Open dates & tasks →</Button>
                           </div>
                         </Card>
                       );

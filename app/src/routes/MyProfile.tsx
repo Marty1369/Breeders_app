@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
 import { Avatar, Button, Card, PageHeader, TextField } from '../components/ui';
@@ -7,13 +7,19 @@ const COLORS = ['#17805a', '#2f6f63', '#7c5f8f', '#b97324', '#4a6fa5', '#b93a2e'
 
 export default function MyProfile() {
   const { me } = useSpace();
-  const [form, setForm] = useState(() => ({
-    name: me?.name || '',
-    phone: me?.phone || '',
-    color: me?.avatar_color || COLORS[0],
-  }));
-  const [prefs, setPrefs] = useState(() => me?.notif_prefs || { push: true, email: false, assignments: true, milestones: true, teammatesTasks: false });
+  const [form, setForm] = useState({ name: '', phone: '', color: COLORS[0] });
+  const [prefs, setPrefs] = useState({ push: true, email: false, assignments: true, milestones: true, teammatesTasks: false });
+  const [hydrated, setHydrated] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  // Hydrate once `me` loads, so a direct load doesn't Save blanks over the
+  // real profile (name/phone/avatar/notif prefs).
+  useEffect(() => {
+    if (!me) return;
+    setForm({ name: me.name || '', phone: me.phone || '', color: me.avatar_color || COLORS[0] });
+    setPrefs(me.notif_prefs || { push: true, email: false, assignments: true, milestones: true, teammatesTasks: false });
+    setHydrated(true);
+  }, [me]);
 
   if (!me) return null;
 
@@ -81,7 +87,7 @@ export default function MyProfile() {
       </Card>
 
       <div className="flex gap-2">
-        <Button onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save'}</Button>
+        <Button onClick={save} disabled={busy || !hydrated}>{busy ? 'Saving…' : 'Save'}</Button>
         <Button variant="ghost" onClick={signOut}>Sign out</Button>
       </div>
     </div>

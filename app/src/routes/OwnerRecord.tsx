@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
@@ -12,19 +12,32 @@ export default function OwnerRecord() {
   const owner = owners.find((o) => o.id === id);
   const puppy = puppies.find((p) => p.owner_id === id);
 
-  const [form, setForm] = useState(() => ({
-    name: owner?.name || '',
-    address: owner?.address || '',
-    phone: owner?.phone || '',
-    email: owner?.email || '',
-    country: owner?.country || '',
-    fullPrice: owner?.full_price ?? 0,
-    handoverDate: owner?.handover_date || '',
-    notes: owner?.notes || '',
-  }));
+  const [form, setForm] = useState({
+    name: '', address: '', phone: '', email: '', country: '',
+    fullPrice: 0, handoverDate: '', notes: '',
+  });
+  const [hydrated, setHydrated] = useState(false);
   const [busy, setBusy] = useState(false);
   const [payAmount, setPayAmount] = useState('');
   const [payKind, setPayKind] = useState<'deposit' | 'final'>('deposit');
+
+  // Hydrate the form once the owner row loads. Without this, a direct URL load
+  // (owners not yet fetched) would leave the form blank and Save would overwrite
+  // the real record with blanks.
+  useEffect(() => {
+    if (!owner) return;
+    setForm({
+      name: owner.name || '',
+      address: owner.address || '',
+      phone: owner.phone || '',
+      email: owner.email || '',
+      country: owner.country || '',
+      fullPrice: owner.full_price ?? 0,
+      handoverDate: owner.handover_date || '',
+      notes: owner.notes || '',
+    });
+    setHydrated(true);
+  }, [owner]);
 
   if (!owner) {
     return (
@@ -90,7 +103,7 @@ export default function OwnerRecord() {
           <TextField label="Handover date" type="date" value={form.handoverDate} onChange={(e) => set('handoverDate', e.target.value)} />
         </div>
         <TextField label="Notes" value={form.notes} onChange={(e) => set('notes', e.target.value)} />
-        <Button onClick={save} disabled={busy} className="mt-3">{busy ? 'Saving…' : 'Save'}</Button>
+        <Button onClick={save} disabled={busy || !hydrated} className="mt-3">{busy ? 'Saving…' : 'Save'}</Button>
       </Card>
 
       <Card className="p-4">
