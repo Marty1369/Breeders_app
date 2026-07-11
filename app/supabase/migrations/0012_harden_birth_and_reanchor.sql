@@ -50,6 +50,7 @@ begin
 end $$;
 
 revoke execute on function log_birth(uuid, text, timestamptz) from public;
+revoke execute on function log_birth(uuid, text, timestamptz) from anon;
 grant execute on function log_birth(uuid, text, timestamptz) to authenticated;
 
 -- ---- backfill anchors on pre-0011 default litter rules ----------------------

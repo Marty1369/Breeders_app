@@ -49,4 +49,5 @@ end $$;
 
 -- Keep it off the anonymous surface; signed-in members only (RLS still applies).
 revoke execute on function log_birth(uuid, text, timestamptz) from public;
+revoke execute on function log_birth(uuid, text, timestamptz) from anon;
 grant execute on function log_birth(uuid, text, timestamptz) to authenticated;
