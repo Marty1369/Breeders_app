@@ -28,7 +28,7 @@ function relDate(startDate: string, today: string, done: boolean): { label: stri
   return { label: niceDate(startDate), tone: 'muted' };
 }
 
-export default function Timeline({ mode = 'both' }: { mode?: 'both' | 'list' | 'calendar' }) {
+export default function Timeline({ mode = 'both', embedded = false }: { mode?: 'both' | 'list' | 'calendar'; embedded?: boolean }) {
   const { litters, tasks, activeLitterId, members } = useSpace();
   const [params, setParams] = useSearchParams();
   const [view, setView] = useState<'list' | 'calendar'>(mode === 'calendar' ? 'calendar' : 'list');
@@ -84,33 +84,46 @@ export default function Timeline({ mode = 'both' }: { mode?: 'both' | 'list' | '
   const title = mode === 'calendar' ? 'Calendar' : mode === 'list' ? 'Tasks' : 'Timeline';
 
   return (
-    <div className="p-4 sm:p-6 max-w-3xl mx-auto">
-      <PageHeader title={title} subtitle={litter.name} />
+    <div className={embedded ? '' : 'p-4 sm:p-6 max-w-3xl mx-auto'}>
+      {!embedded && <PageHeader title={title} subtitle={litter.name} />}
 
       <div className="flex flex-col gap-3 mb-4">
         {mode === 'both' && (
           <SegmentedControl value={view} onChange={setView} options={[{ value: 'list', label: 'List' }, { value: 'calendar', label: 'Calendar' }]} />
         )}
-        {mode === 'list' && <TaskViewToggle current="list" />}
-        <div className="flex gap-1.5 overflow-x-auto pb-1">
-          {PHASES.map((p) => (
+        {mode === 'list' && !embedded && <TaskViewToggle current="list" />}
+        {/* Stages live once, as group headers — no redundant phase-filter pills
+            in the Plan tab (spec §4.1). Keep them only on the standalone screen. */}
+        {embedded ? (
+          <div className="flex">
             <button
-              key={p.value}
-              onClick={() => setPhase(p.value)}
-              className={`flex-none px-3 py-1.5 rounded-full text-[11.5px] font-extrabold cursor-pointer whitespace-nowrap ${
-                phase === p.value ? 'bg-accent text-white' : 'bg-chip-bg text-muted'
-              }`}
+              onClick={() => setFormOpen(true)}
+              className="ml-auto px-3 py-1.5 rounded-full text-[12px] font-extrabold cursor-pointer bg-accent-soft text-accent whitespace-nowrap"
             >
-              {p.label}
+              ＋ New task
             </button>
-          ))}
-          <button
-            onClick={() => setFormOpen(true)}
-            className="flex-none ml-auto px-3 py-1.5 rounded-full text-[11.5px] font-extrabold cursor-pointer bg-accent-soft text-accent whitespace-nowrap"
-          >
-            ＋ New task
-          </button>
-        </div>
+          </div>
+        ) : (
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            {PHASES.map((p) => (
+              <button
+                key={p.value}
+                onClick={() => setPhase(p.value)}
+                className={`flex-none px-3 py-1.5 rounded-full text-[11.5px] font-extrabold cursor-pointer whitespace-nowrap ${
+                  phase === p.value ? 'bg-accent text-white' : 'bg-chip-bg text-muted'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+            <button
+              onClick={() => setFormOpen(true)}
+              className="flex-none ml-auto px-3 py-1.5 rounded-full text-[11.5px] font-extrabold cursor-pointer bg-accent-soft text-accent whitespace-nowrap"
+            >
+              ＋ New task
+            </button>
+          </div>
+        )}
       </div>
 
       {effectiveView === 'list' ? (

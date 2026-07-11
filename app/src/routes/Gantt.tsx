@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSpace } from '../state/SpaceProvider';
 import { Button, EmptyState } from '../components/ui';
 import { addDays, diffDays, niceDate, todayStr } from '../lib/dates';
+import { effectiveDate } from '../lib/scheduling';
+import { PlusIcon, RepeatIcon } from '../components/icons';
 import TaskDetailSheet from '../components/task/TaskDetailSheet';
 import CompleteTaskSheet from '../components/task/CompleteTaskSheet';
 import TaskFormSheet from '../components/task/TaskFormSheet';
@@ -15,9 +17,7 @@ const ROW_H = 28;
 const HEAD_H = 24;
 const NAME_W = 172;
 
-const DONE_COLOR = '#c9cec8';
 const LATE_COLOR = '#c0392b';
-const SOON_COLOR = '#d1852a';
 const TODAY_LINE = '#334155';
 
 interface Entry {
@@ -37,18 +37,22 @@ interface Layout {
   xOf: (d: string) => number;
 }
 
-/** Status treatment for a task's bar: done greyed, overdue red, due-soon orange, else phase colour. */
-function barStyle(t: Task, phase: TaskPhase, today: string): { bg: string; opacity: number } {
-  if (t.status === 'done') return { bg: DONE_COLOR, opacity: 0.75 };
-  const due = t.due_date ?? t.start_date;
-  if (due < today) return { bg: LATE_COLOR, opacity: 1 };
-  // Due soon = the DUE date is within 3 days (not the start — a long task that
-  // began last week but is due next month is not "due soon").
-  if (due >= today && due <= addDays(today, 3)) return { bg: SOON_COLOR, opacity: 1 };
-  return { bg: PHASE_COLOR[phase], opacity: 1 };
+interface Milestone { key: string; label: string; date: string; color: string }
+
+function okMs(key: string, label: string, date: string | null, color: string): Milestone | null {
+  return date ? { key, label, date, color } : null;
 }
 
-export default function Gantt() {
+// Single colour encoding (spec §4.3): bar colour = stage colour only. Done and
+// late are shown as a ✓ glyph + fade and a red ring, not a colour swap.
+function barStyle(t: Task, phase: TaskPhase, today: string): { bg: string; opacity: number; done: boolean; lateDays: number } {
+  const done = t.status === 'done';
+  const due = t.due_date ?? t.start_date;
+  const lateDays = !done && due < today ? diffDays(due, today) : 0;
+  return { bg: PHASE_COLOR[phase], opacity: done ? 0.45 : 1, done, lateDays };
+}
+
+export default function Gantt({ embedded = false }: { embedded?: boolean }) {
   const { litters, tasks, activeLitterId } = useSpace();
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [completeTask, setCompleteTask] = useState<Task | null>(null);
@@ -64,6 +68,20 @@ export default function Gantt() {
     () => tasks.filter((t) => t.litter_id === activeLitterId),
     [tasks, activeLitterId]
   );
+
+  // Milestone rules (spec §4.3): dashed vertical lines from the litter's dates.
+  const milestones = useMemo<Milestone[]>(() => {
+    if (!litter) return [];
+    const w = effectiveDate(litter.dates, 'whelping');
+    const items: (Milestone | null)[] = [
+      okMs('ovulation', 'Ovulation', effectiveDate(litter.dates, 'ovulation'), '#4a6fa5'),
+      okMs('birth', 'Birth', w, '#17805a'),
+      okMs('vaccine', 'Vaccine #1', w ? addDays(w, 49) : null, '#b97324'),
+      okMs('weaning', 'Weaning', effectiveDate(litter.dates, 'weaning'), '#4a6fa5'),
+      okMs('home', 'Home day', effectiveDate(litter.dates, 'handover'), '#17805a'),
+    ];
+    return items.filter((m): m is Milestone => m != null);
+  }, [litter]);
 
   const layout = useMemo(() => {
     if (litterTasks.length === 0) return null;
@@ -100,36 +118,39 @@ export default function Gantt() {
     if (!scrollRef.current || !layout) return;
     if (scrolledFor.current === activeLitterId) return;
     const nowX = diffDays(layout.min, today) * DAY_W;
-    scrollRef.current.scrollLeft = Math.max(0, NAME_W + nowX - 140);
+    // Center today in the viewport (spec §4.3), not pinned near the left edge.
+    const vw = scrollRef.current.clientWidth || 0;
+    scrollRef.current.scrollLeft = Math.max(0, NAME_W + nowX - vw / 2);
     scrolledFor.current = activeLitterId ?? null;
   }, [activeLitterId, layout, today]);
 
   if (!litter) return <div className="p-6"><EmptyState title="No litter selected" /></div>;
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="flex items-start justify-between gap-3 mb-0.5">
-        <div>
-          <div className="text-[19px] font-extrabold">Gantt</div>
-          <div className="text-[11.5px] text-faint font-semibold">{litter.name} · lines show task dependencies</div>
-        </div>
+    <div className={embedded ? '' : 'p-4 sm:p-6'}>
+      <div className="flex items-start justify-between gap-3 mb-2">
+        {!embedded ? (
+          <div>
+            <div className="text-[22px] font-extrabold">Plan & timeline</div>
+            <div className="text-[12px] text-faint font-semibold">{litter.name} · lines show task dependencies</div>
+          </div>
+        ) : (
+          <div className="text-[12px] text-faint font-semibold self-center">Lines show task dependencies · dashed rules are milestones</div>
+        )}
         <div className="flex gap-2 flex-none">
-          <Button variant="secondary" size="sm" icon="⟳" onClick={() => setNewRepeatOpen(true)}>Repeat</Button>
-          <Button size="sm" icon="＋" onClick={() => setNewTaskOpen(true)}>New task</Button>
+          <Button variant="secondary" size="sm" icon={<RepeatIcon size={15} />} onClick={() => setNewRepeatOpen(true)}>Repeat</Button>
+          <Button size="sm" icon={<PlusIcon size={15} />} onClick={() => setNewTaskOpen(true)}>New task</Button>
         </div>
       </div>
-      <div className="my-3"><TaskViewToggle current="gantt" /></div>
+      {!embedded && <div className="my-3"><TaskViewToggle current="gantt" /></div>}
 
-      <div className="flex flex-wrap gap-x-3 gap-y-1.5 mb-3 text-[10.5px] font-bold text-muted">
+      {/* Legend: the 4 stage keys only (spec §4.3). Done/late are shown on the bars. */}
+      <div className="flex flex-wrap gap-x-3 gap-y-1.5 mb-3 text-[11px] font-bold text-muted">
         {PHASE_ORDER.map((p) => (
           <span key={p} className="flex items-center gap-1.5">
             <span className="w-3 h-2 rounded-sm" style={{ background: PHASE_COLOR[p] }} /> {PHASE_LABEL[p]}
           </span>
         ))}
-        <span className="w-px h-3 bg-border-strong mx-1" />
-        <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-sm" style={{ background: SOON_COLOR }} /> Due soon</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-sm" style={{ background: LATE_COLOR }} /> Late</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-sm" style={{ background: DONE_COLOR }} /> Done</span>
       </div>
 
       {!layout ? (
@@ -138,6 +159,7 @@ export default function Gantt() {
         <GanttChart
           layout={layout}
           litterTasks={litterTasks}
+          milestones={milestones}
           today={today}
           scrollRef={scrollRef}
           onOpen={onOpen}
@@ -159,10 +181,11 @@ export default function Gantt() {
 }
 
 function GanttChart({
-  layout, litterTasks, today, scrollRef, onOpen,
+  layout, litterTasks, milestones, today, scrollRef, onOpen,
 }: {
   layout: Layout;
   litterTasks: Task[];
+  milestones: Milestone[];
   today: string;
   scrollRef: React.RefObject<HTMLDivElement | null>;
   onOpen: (t: Task) => void;
@@ -170,6 +193,9 @@ function GanttChart({
   const { min, totalDays, entries, height, yByTask, xOf } = layout;
   const chartW = totalDays * DAY_W;
   const nowX = diffDays(min, today) * DAY_W;
+  const msX = milestones
+    .map((m) => ({ ...m, x: diffDays(min, m.date) * DAY_W }))
+    .filter((m) => m.x >= 0 && m.x <= chartW);
 
   const ticks: { x: number; label: string }[] = [];
   for (let i = 0; i < totalDays; i += 7) ticks.push({ x: i * DAY_W, label: niceDate(addDays(min, i)) });
@@ -201,8 +227,17 @@ function GanttChart({
             {ticks.map((tk, i) => (
               <div key={i} className="absolute text-[9px] font-bold text-faint" style={{ left: tk.x + 2, top: 6 }}>{tk.label}</div>
             ))}
+            {msX.map((m) => (
+              <div
+                key={m.key}
+                className="absolute text-[8.5px] font-extrabold text-white rounded-[4px] px-1 whitespace-nowrap"
+                style={{ left: m.x + 2, top: 4, background: m.color }}
+              >
+                {m.label} · {niceDate(m.date)}
+              </div>
+            ))}
             {nowX >= 0 && nowX <= chartW && (
-              <div className="absolute text-[8.5px] font-extrabold text-white rounded-[3px] px-1" style={{ left: nowX, top: 4, background: TODAY_LINE }}>TODAY</div>
+              <div className="absolute text-[8.5px] font-extrabold text-white rounded-[4px] px-1 whitespace-nowrap z-10" style={{ left: nowX + 2, top: 4, background: TODAY_LINE }}>TODAY · {niceDate(today)}</div>
             )}
           </div>
         </div>
@@ -211,7 +246,15 @@ function GanttChart({
           {ticks.map((tk, i) => (
             <div key={i} className="absolute top-0 bottom-0 border-l border-border-soft" style={{ left: NAME_W + tk.x }} />
           ))}
-          {/* today line */}
+          {/* dashed milestone rules */}
+          {msX.map((m) => (
+            <div
+              key={m.key}
+              className="absolute top-0 bottom-0"
+              style={{ left: NAME_W + m.x, width: 0, borderLeft: `2px dashed ${m.color}`, opacity: 0.7 }}
+            />
+          ))}
+          {/* today line — solid, distinct from the dashed milestones */}
           {nowX >= 0 && nowX <= chartW && (
             <div className="absolute top-0 bottom-0 z-10" style={{ left: NAME_W + nowX, width: 2, background: TODAY_LINE }} />
           )}
@@ -241,12 +284,11 @@ function GanttChart({
             const x = xOf(t.start_date);
             const w = Math.max(DAY_W, (diffDays(t.start_date, t.due_date ?? t.start_date) + 1) * DAY_W);
             const style = barStyle(t, e.phase, today);
-            const done = t.status === 'done';
             return (
               <div key={t.id}>
                 <button
-                  className={`absolute text-[11px] font-semibold truncate cursor-pointer hover:text-accent text-left ${done ? 'text-faint line-through' : ''}`}
-                  style={{ left: 8, top: e.y + 7, width: NAME_W - 14 }}
+                  className={`absolute text-[12px] font-semibold truncate cursor-pointer hover:text-accent text-left ${style.done ? 'text-faint line-through' : ''}`}
+                  style={{ left: 8, top: e.y + 6, width: NAME_W - 14 }}
                   onClick={() => onOpen(t)}
                   title={t.name}
                 >
@@ -254,12 +296,26 @@ function GanttChart({
                 </button>
                 <button
                   onClick={() => onOpen(t)}
-                  className="absolute rounded-[5px] cursor-pointer flex items-center px-1.5 overflow-hidden"
-                  style={{ left: NAME_W + x, top: e.y + 5, width: w, height: ROW_H - 10, background: style.bg, opacity: style.opacity }}
+                  className="absolute rounded-[6px] cursor-pointer flex items-center gap-1 px-1.5 overflow-hidden z-[5]"
+                  style={{
+                    left: NAME_W + x,
+                    top: e.y + 4,
+                    width: w,
+                    height: ROW_H - 8,
+                    background: style.bg,
+                    opacity: style.opacity,
+                    boxShadow: style.lateDays > 0 ? `0 0 0 2px ${LATE_COLOR}` : undefined,
+                  }}
                   title={`${t.name} · ${niceDate(t.start_date)}${t.duration_days ? `–${niceDate(t.due_date ?? t.start_date)}` : ''}`}
                 >
-                  {w > 40 && <span className="text-white text-[9px] font-bold truncate">{niceDate(t.start_date)}</span>}
+                  {style.done && <span className="text-white text-[10px] font-extrabold flex-none">✓</span>}
+                  {w > 44 && <span className="text-white text-[9px] font-bold truncate">{niceDate(t.start_date)}</span>}
                 </button>
+                {style.lateDays > 0 && (
+                  <span className="absolute text-[9px] font-extrabold whitespace-nowrap" style={{ left: NAME_W + x + w + 4, top: e.y + 8, color: LATE_COLOR }}>
+                    {style.lateDays} day{style.lateDays === 1 ? '' : 's'} late
+                  </span>
+                )}
               </div>
             );
           })}

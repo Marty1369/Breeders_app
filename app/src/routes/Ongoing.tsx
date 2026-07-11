@@ -3,6 +3,7 @@ import { useSpace } from '../state/SpaceProvider';
 import { useAuth } from '../state/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { Avatar, Button, Card, Chip, EmptyState, PageHeader } from '../components/ui';
+import { RepeatIcon } from '../components/icons';
 import { addDays, longDate, niceDate, todayStr } from '../lib/dates';
 import { checkKey, occurrencesForDate, ruleEndDate, ruleOccursOn } from '../lib/recurrence';
 import { setOccurrence } from '../lib/actions';
@@ -62,7 +63,7 @@ function scheduleSummary(rule: RecurrenceRule): string {
   return `${freq} · ${rule.times.join(', ')}`;
 }
 
-export default function Ongoing() {
+export default function Ongoing({ embedded = false }: { embedded?: boolean }) {
   const { recurrenceRules, ruleChecks, litters, activeLitterId, members, space } = useSpace();
   const { user } = useAuth();
   const [editRule, setEditRule] = useState<RecurrenceRule | null>(null);
@@ -101,14 +102,26 @@ export default function Ongoing() {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-2xl mx-auto">
-      <PageHeader
-        title="Agenda"
-        subtitle={activeLitter ? activeLitter.name : undefined}
-        action={<Button icon="⟳" onClick={() => { setEditRule(null); setFormOpen(true); }}>New repeat</Button>}
-      />
+    <div className={embedded ? '' : 'p-4 sm:p-6 max-w-2xl mx-auto'}>
+      {embedded ? (
+        <div className="flex mb-4">
+          <button
+            onClick={() => { setEditRule(null); setFormOpen(true); }}
+            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-extrabold cursor-pointer bg-accent-soft text-accent"
+          >
+            <RepeatIcon size={15} /> New repeat
+          </button>
+        </div>
+      ) : (
+        <PageHeader
+          title="Routines"
+          subtitle={activeLitter ? activeLitter.name : undefined}
+          action={<Button icon={<RepeatIcon size={15} />} onClick={() => { setEditRule(null); setFormOpen(true); }}>New repeat</Button>}
+        />
+      )}
 
-      {todayOccurrences.length > 0 && (
+      {/* Daily check-offs live on Home, not here (spec §4.4). */}
+      {!embedded && todayOccurrences.length > 0 && (
         <Card className="p-4 mb-5">
           <div className="text-[11px] font-extrabold text-faint tracking-wide mb-3">
             DAILY · TODAY · {todayOccurrences.filter((o) => o.check?.status === 'done').length}/{todayOccurrences.length} done
@@ -151,7 +164,7 @@ export default function Ongoing() {
         <EmptyState
           title="No recurring tasks yet"
           subtitle="Recurring chores like weigh-ins and box temperature checks live here."
-          action={<Button icon="⟳" onClick={() => { setEditRule(null); setFormOpen(true); }}>New repeat</Button>}
+          action={<Button icon={<RepeatIcon size={15} />} onClick={() => { setEditRule(null); setFormOpen(true); }}>New repeat</Button>}
         />
       ) : (
         <div className="flex flex-col gap-4">

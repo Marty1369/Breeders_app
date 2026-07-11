@@ -1,27 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Link, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { activeEnv } from '../lib/supabase';
 import type { ReactNode } from 'react';
 import { Avatar } from '../components/ui';
-import { niceDate, todayStr, diffDays } from '../lib/dates';
+import { todayStr, diffDays } from '../lib/dates';
 import { effectiveDate } from '../lib/scheduling';
 import { litterProgress } from '../lib/stages';
+import type { Dog } from '../lib/types';
 import {
-  HomeIcon, PawIcon, FileIcon, UsersIcon, CoinsIcon, DogIcon, CalendarIcon, ListIcon,
-  RepeatIcon, HeartPulseIcon, ScaleIcon, CrossIcon, MenuIcon, SearchIcon, BellIcon,
-  PlusIcon, ChevronsUpDownIcon,
+  HomeIcon, PawIcon, FileIcon, UsersIcon, CoinsIcon, DogIcon, CalendarIcon, BuildingIcon,
+  SettingsIcon, SearchIcon, BellIcon, PlusIcon, ChevronsUpDownIcon,
 } from '../components/icons';
 import LitterSwitcherSheet from '../components/LitterSwitcherSheet';
 import TaskFormSheet from '../components/task/TaskFormSheet';
-import Dashboard from './Dashboard';
-import Ongoing from './Ongoing';
-import Today from './Today';
-import Gantt from './Gantt';
+import Home from './Home';
+import Plan from './Plan';
 import Litters from './Litters';
 import { AllDocuments, AllBuyers, AllExpenses } from './Aggregates';
 import Dogs from './Dogs';
-import Timeline from './Timeline';
 import LitterInfo from './LitterInfo';
 import BirthLog from './BirthLog';
 import WeighIn from './WeighIn';
@@ -43,41 +40,36 @@ import Menu from './Menu';
 
 type NavItem = { to: string; label: string; icon: ReactNode; end?: boolean };
 
-const KENNEL_NAV: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: <HomeIcon />, end: true },
-  { to: '/litters', label: 'Litters', icon: <PawIcon /> },
-  { to: '/all-documents', label: 'All documents', icon: <FileIcon /> },
-  { to: '/all-buyers', label: 'All buyers', icon: <UsersIcon /> },
-  { to: '/all-expenses', label: 'All expenses', icon: <CoinsIcon /> },
-  { to: '/dogs', label: 'My dogs', icon: <DogIcon /> },
-];
-
-const LITTER_NAV: NavItem[] = [
-  { to: '/gantt', label: 'Gantt', icon: <CalendarIcon /> },
-  { to: '/tasks', label: 'Tasks', icon: <ListIcon /> },
-  { to: '/ongoing', label: 'Agenda', icon: <RepeatIcon /> },
-  { to: '/whelping', label: 'Whelping', icon: <HeartPulseIcon /> },
-  { to: '/weigh-in', label: 'Weigh-ins', icon: <ScaleIcon /> },
-  { to: '/puppies', label: 'Puppies', icon: <PawIcon /> },
-  { to: '/health-log', label: 'Health log', icon: <CrossIcon /> },
-  { to: '/docs', label: 'Documents', icon: <FileIcon /> },
+// Desktop sidebar: 8 items in two groups (spec §2.2).
+const THIS_LITTER_NAV: NavItem[] = [
+  { to: '/', label: 'Home', icon: <HomeIcon />, end: true },
+  { to: '/plan', label: 'Plan & timeline', icon: <CalendarIcon /> },
+  { to: '/puppies', label: 'Puppies & care', icon: <PawIcon /> },
   { to: '/buyers', label: 'Buyers', icon: <UsersIcon /> },
-  { to: '/expenses', label: 'Expenses', icon: <CoinsIcon /> },
+  { to: '/expenses', label: 'Money', icon: <CoinsIcon /> },
+  { to: '/docs', label: 'Documents', icon: <FileIcon /> },
 ];
 
+const MY_KENNEL_NAV: NavItem[] = [
+  { to: '/litters', label: 'Dogs & litters', icon: <DogIcon /> },
+  { to: '/settings', label: 'Settings & team', icon: <SettingsIcon /> },
+];
+
+// Mobile bottom bar: 4 tabs, each labelled by what it opens (spec §2.1).
 const MOBILE_NAV: NavItem[] = [
-  { to: '/today', label: 'Today', icon: <HomeIcon />, end: false },
-  { to: '/tasks', label: 'Plan', icon: <CalendarIcon />, end: false },
-  { to: '/puppies', label: 'Litter', icon: <PawIcon />, end: false },
-  { to: '/menu', label: 'More', icon: <MenuIcon />, end: false },
+  { to: '/', label: 'Home', icon: <HomeIcon />, end: true },
+  { to: '/plan', label: 'Plan', icon: <CalendarIcon />, end: false },
+  { to: '/puppies', label: 'Puppies', icon: <PawIcon />, end: false },
+  { to: '/kennel', label: 'Kennel', icon: <BuildingIcon />, end: false },
 ];
 
 export default function AppShell() {
   const [width, setWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [newTaskOpen, setNewTaskOpen] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
   const isDesktop = width >= 900;
-  const { space, litters, activeLitterId, notifications, me } = useSpace();
+  const { space, litters, dogs, activeLitterId, notifications, me } = useSpace();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -102,66 +94,58 @@ export default function AppShell() {
     pct = Math.max(0, Math.min(100, (diffDays(heat, todayStr()) / total) * 100));
   }
 
-  const litterLabel = activeLitter ? activeLitter.name.toUpperCase() : 'NO LITTER';
-
   return (
     <div className="h-full flex flex-col bg-app-bg text-ink overflow-hidden">
       <div className="flex-1 flex min-h-0">
         {isDesktop && (
-          <div className="w-[236px] flex-none bg-card border-r border-border flex flex-col p-3.5 pt-4 overflow-y-auto">
+          <div className="w-[248px] flex-none text-white flex flex-col p-3.5 pt-4 overflow-y-auto" style={{ background: '#123f2d' }}>
             <Link to="/" className="flex items-center gap-2.5 px-0.5">
               <Logo size={34} />
               <div>
-                <div className="text-[14px] font-extrabold text-ink">Litter Planner</div>
-                <div className="text-[10px] text-faint font-bold truncate max-w-[150px]">{space?.kennel_name || space?.name}</div>
+                <div className="text-[14px] font-extrabold text-white">Litter Planner</div>
+                <div className="text-[10px] text-white/60 font-bold truncate max-w-[160px]">{space?.kennel_name || space?.name}</div>
               </div>
             </Link>
 
-            <NavGroup label="KENNEL" items={KENNEL_NAV} />
-
-            {/* Current-litter switcher header */}
+            {/* The one switcher: "You're looking at" litter card */}
             <button
               onClick={() => setSwitcherOpen(true)}
-              className="mt-4 mb-1 w-full flex items-center gap-2 px-2 py-1.5 rounded-[9px] hover:bg-muted-bg cursor-pointer text-left"
+              className="mt-4 w-full rounded-[14px] px-3 py-3 text-left cursor-pointer"
+              style={{ background: 'rgba(255,255,255,0.08)' }}
             >
-              <div className="min-w-0 flex-1">
-                <div className="text-[10px] font-extrabold tracking-wide text-faint">You're looking at</div>
-                <div className="text-[13.5px] font-extrabold text-accent truncate">{activeLitter ? activeLitter.name : 'None selected'}</div>
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[10px] font-extrabold tracking-wide text-[#7fd4ae]">You're looking at</div>
+                  <div className="text-[14px] font-extrabold truncate">{activeLitter ? activeLitter.name : 'No litter selected'}</div>
+                </div>
+                <span className="text-white/60 flex-none"><ChevronsUpDownIcon size={16} /></span>
               </div>
-              <span className="text-muted flex-none"><ChevronsUpDownIcon size={16} /></span>
+              {activeLitter && (
+                <>
+                  <div className="text-[11px] text-white/70 font-semibold mt-0.5 truncate">
+                    {dogName(dogs, activeLitter.dam_id)} × {dogName(dogs, activeLitter.sire_id)}
+                  </div>
+                  <div className="text-[11.5px] font-bold mt-1">{progress?.headline}</div>
+                  <div className="mt-1.5 h-[5px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.15)' }}>
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: '#7fd4ae' }} />
+                  </div>
+                </>
+              )}
             </button>
-            <nav className={`flex flex-col gap-0.5 ${!activeLitter ? 'opacity-40 pointer-events-none' : ''}`}>
-              {LITTER_NAV.map((item) => (
-                <SideLink key={item.to} {...item} />
-              ))}
-            </nav>
 
-            {activeLitter && (
-              <button
-                onClick={() => setSwitcherOpen(true)}
-                className="mt-3.5 bg-muted-bg border border-card-border rounded-[12px] px-3 py-2.5 text-left cursor-pointer"
-              >
-                <div className="text-[9.5px] font-extrabold tracking-wider text-accent">{litterLabel}</div>
-                <div className="text-[13px] font-extrabold mt-0.5">{progress?.headline || activeLitter.status.replace('_', ' ')}</div>
-                <div className="mt-1.5 h-[5px] rounded-full bg-[#eef0ec] overflow-hidden">
-                  <div className="h-full bg-accent rounded-full" style={{ width: `${pct}%` }} />
-                </div>
-                <div className="text-[11px] text-muted font-semibold leading-relaxed mt-1.5">
-                  {progress?.detail || (whelping ? `whelping ${niceDate(whelping)}` : 'dates fill in as they come')}
-                </div>
-              </button>
-            )}
+            <SideGroup label="THIS LITTER" items={THIS_LITTER_NAV} disabled={!activeLitter} />
+            <SideGroup label="MY KENNEL" items={MY_KENNEL_NAV} />
 
             <div className="flex-1" />
 
             <button
               onClick={() => navigate('/profile')}
-              className="flex items-center gap-2.5 px-1 py-2 rounded-[10px] hover:bg-muted-bg cursor-pointer text-left"
+              className="flex items-center gap-2.5 px-1 py-2 rounded-[10px] hover:bg-white/[0.07] cursor-pointer text-left"
             >
               {me && <Avatar name={me.name} color={me.avatar_color} size={30} />}
               <div className="min-w-0">
-                <div className="text-[12px] font-extrabold truncate">{me?.name}</div>
-                <div className="text-[10px] text-faint font-semibold">My profile</div>
+                <div className="text-[12px] font-extrabold truncate text-white">{me?.name}</div>
+                <div className="text-[10px] text-white/55 font-semibold">My profile</div>
               </div>
             </button>
           </div>
@@ -198,18 +182,23 @@ export default function AppShell() {
 
           <div className="flex-1 overflow-y-auto min-h-0 pb-16 sm:pb-0">
             <Routes>
-              <Route path="/" element={<Dashboard />} />
-              {/* KENNEL (cross-litter) */}
+              <Route path="/" element={<Home />} />
+              <Route path="/plan" element={<Plan />} />
+              <Route path="/kennel" element={<Menu />} />
+              {/* Retired routes → redirects (spec §2.1) */}
+              <Route path="/today" element={<Navigate to="/" replace />} />
+              <Route path="/tasks" element={<Navigate to="/plan" replace />} />
+              <Route path="/gantt" element={<Navigate to="/plan?tab=gantt" replace />} />
+              <Route path="/ongoing" element={<Navigate to="/plan?tab=routines" replace />} />
+              <Route path="/menu" element={<Navigate to="/kennel" replace />} />
+              <Route path="/litters/new" element={<Navigate to="/dogs?new_litter=1" replace />} />
+              {/* Cross-litter */}
               <Route path="/litters" element={<Litters />} />
               <Route path="/all-documents" element={<AllDocuments />} />
               <Route path="/all-buyers" element={<AllBuyers />} />
               <Route path="/all-expenses" element={<AllExpenses />} />
               <Route path="/dogs" element={<Dogs />} />
-              {/* LITTER (active-litter scoped) */}
-              <Route path="/gantt" element={<Gantt />} />
-              <Route path="/tasks" element={<Timeline mode="list" />} />
-              <Route path="/ongoing" element={<Ongoing />} />
-              <Route path="/today" element={<Today />} />
+              {/* Litter-scoped */}
               <Route path="/weigh-in" element={<WeighIn />} />
               <Route path="/puppies" element={<Puppies />} />
               <Route path="/puppies/:id" element={<PuppyProfile />} />
@@ -229,7 +218,6 @@ export default function AppShell() {
               <Route path="/settings" element={<Settings />} />
               <Route path="/profile" element={<MyProfile />} />
               <Route path="/search" element={<Search />} />
-              <Route path="/menu" element={<Menu />} />
             </Routes>
           </div>
         </div>
@@ -246,11 +234,37 @@ export default function AppShell() {
       {!isDesktop && activeLitter && (
         <button
           aria-label="Add to this litter"
-          onClick={() => setNewTaskOpen(true)}
+          onClick={() => setFabOpen(true)}
           className="fixed bottom-20 right-4 z-30 w-14 h-14 rounded-full bg-accent text-white grid place-items-center shadow-lg cursor-pointer"
         >
           <PlusIcon size={26} />
         </button>
+      )}
+
+      {/* FAB chooser — always "add to this litter" (spec §2.1) */}
+      {fabOpen && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center" onClick={() => setFabOpen(false)}>
+          <div className="absolute inset-0 bg-black/35" />
+          <div className="relative bg-card w-full rounded-t-[18px] p-4 pb-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="text-[11px] font-extrabold tracking-wide text-faint mb-2">Add to {activeLitter?.name}</div>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: 'Task', run: () => setNewTaskOpen(true) },
+                { label: 'Weight', run: () => navigate('/weigh-in') },
+                { label: 'Expense', run: () => navigate('/expenses') },
+                { label: 'Note', run: () => setNewTaskOpen(true) },
+              ].map((o) => (
+                <button
+                  key={o.label}
+                  onClick={() => { setFabOpen(false); o.run(); }}
+                  className="py-3 rounded-[12px] bg-muted-bg text-[14px] font-extrabold cursor-pointer hover:bg-accent-soft hover:text-accent"
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       <LitterSwitcherSheet open={switcherOpen} onClose={() => setSwitcherOpen(false)} />
@@ -260,10 +274,15 @@ export default function AppShell() {
 }
 
 function isMobileTabActive(to: string, path: string): boolean {
-  if (to === '/tasks') return ['/tasks', '/gantt', '/ongoing'].some((p) => path.startsWith(p));
-  if (to === '/puppies') return ['/puppies', '/weigh-in', '/docs', '/health-log'].some((p) => path.startsWith(p));
-  if (to === '/menu') return ['/menu', '/expenses', '/dogs', '/buyers', '/team', '/settings'].some((p) => path.startsWith(p));
+  if (to === '/') return path === '/';
+  if (to === '/plan') return ['/plan', '/tasks', '/gantt', '/ongoing'].some((p) => path.startsWith(p));
+  if (to === '/puppies') return ['/puppies', '/weigh-in', '/health-log', '/whelping', '/docs'].some((p) => path.startsWith(p));
+  if (to === '/kennel') return ['/kennel', '/menu', '/litters', '/dogs', '/buyers', '/expenses', '/team', '/settings', '/all-'].some((p) => path.startsWith(p));
   return path === to || path.startsWith(to + '/');
+}
+
+function dogName(dogs: Dog[], id: string | null): string {
+  return dogs.find((d) => d.id === id)?.name ?? '—';
 }
 
 function Logo({ size }: { size: number }) {
@@ -279,10 +298,10 @@ function Logo({ size }: { size: number }) {
   );
 }
 
-function NavGroup({ label, items, disabled }: { label: string; items: NavItem[]; disabled?: boolean }) {
+function SideGroup({ label, items, disabled }: { label: string; items: NavItem[]; disabled?: boolean }) {
   return (
     <>
-      <div className="text-[10px] font-extrabold tracking-wider text-faint mt-4 mb-1.5 px-0.5 truncate">{label}</div>
+      <div className="text-[10px] font-extrabold tracking-wider text-white/45 mt-4 mb-1.5 px-1 truncate">{label}</div>
       <nav className={`flex flex-col gap-0.5 ${disabled ? 'opacity-40 pointer-events-none' : ''}`}>
         {items.map((item) => (
           <SideLink key={item.to} {...item} />
@@ -299,7 +318,7 @@ function SideLink({ to, label, icon, end }: NavItem) {
       end={end}
       className={({ isActive }) =>
         `flex items-center gap-2.5 px-2.5 py-2 rounded-[10px] text-[13px] font-extrabold whitespace-nowrap ${
-          isActive ? 'bg-accent-soft text-accent' : 'text-[#3a413d] hover:bg-muted-bg'
+          isActive ? 'bg-white/[0.14] text-white' : 'text-white/70 hover:bg-white/[0.07]'
         }`
       }
     >

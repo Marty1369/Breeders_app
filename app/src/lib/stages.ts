@@ -64,10 +64,16 @@ export function litterProgress(litter: Litter, today: string = todayStr()): Litt
   const whelp = effectiveDate(litter.dates, 'whelping');
   const handover = effectiveDate(litter.dates, 'handover');
   const closed = litter.status === 'closed' || litter.status === 'did_not_take';
+  // "Born" is a real event, not merely the predicted date arriving: a pregnant
+  // bitch is routinely a day or two overdue before whelping is logged, and we
+  // must not announce puppies until birth actually happened. Trust the actual
+  // whelping date / status, never the predicted fallback.
+  const born =
+    litter.dates.whelping?.actual != null || litter.status === 'born' || litter.status === 'closed';
 
-  // Born (or whelping date already passed) → age-based framing.
-  if (whelp && whelp <= today) {
-    const ageDays = diffDays(whelp, today);
+  // Born → age-based framing.
+  if (born && whelp) {
+    const ageDays = Math.max(0, diffDays(whelp, today));
     const weeks = Math.floor(ageDays / 7);
     let headline: string;
     if (ageDays === 0) headline = 'Puppies were born today';
@@ -75,7 +81,7 @@ export function litterProgress(litter: Litter, today: string = todayStr()): Litt
     else headline = `Puppies are ${weeks} week${weeks === 1 ? '' : 's'} old`;
 
     let detail = '';
-    if (closed) detail = 'Litter closed';
+    if (litter.status === 'closed') detail = 'Litter closed';
     else if (handover && handover > today) {
       const m = diffDays(today, handover);
       detail = `they go home in ${m} day${m === 1 ? '' : 's'} (${niceDate(handover)})`;
@@ -83,12 +89,26 @@ export function litterProgress(litter: Litter, today: string = todayStr()): Litt
     return { headline, detail, ageDays, weeks };
   }
 
-  // Before birth → countdown framing.
-  if (whelp && whelp > today) {
+  // Terminal but never whelped (did_not_take, or an empty closed litter).
+  if (closed) {
+    return { headline: 'Litter closed', detail: '', ageDays: null, weeks: null };
+  }
+
+  // Before birth → countdown framing. Covers the overdue-but-not-yet-logged case
+  // too (n ≤ 0), where we keep pointing at the due date rather than claim a birth.
+  if (whelp) {
     const n = diffDays(today, whelp);
+    if (n > 0) {
+      return {
+        headline: `${n} day${n === 1 ? '' : 's'} to birth`,
+        detail: `puppies due around ${niceDate(whelp)}`,
+        ageDays: null,
+        weeks: null,
+      };
+    }
     return {
-      headline: `${n} day${n === 1 ? '' : 's'} to birth`,
-      detail: `puppies due around ${niceDate(whelp)}`,
+      headline: n === 0 ? 'Puppies due today' : 'Birth is due',
+      detail: `due around ${niceDate(whelp)}`,
       ageDays: null,
       weeks: null,
     };
@@ -96,8 +116,8 @@ export function litterProgress(litter: Litter, today: string = todayStr()): Litt
 
   // No whelping date yet (planned/early).
   return {
-    headline: closed ? 'Litter closed' : 'Planning a litter',
-    detail: closed ? '' : 'dates fill in as they come',
+    headline: 'Planning a litter',
+    detail: 'dates fill in as they come',
     ageDays: null,
     weeks: null,
   };

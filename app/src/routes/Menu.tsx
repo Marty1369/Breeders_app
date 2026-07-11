@@ -17,7 +17,7 @@ const ITEMS: { to: string; label: string; icon: ReactNode }[] = [
   { to: '/expenses', label: 'Expenses', icon: <CoinsIcon /> },
   { to: '/buyers', label: 'Buyers', icon: <UsersIcon /> },
   { to: '/docs', label: 'Documents', icon: <FileIcon /> },
-  { to: '/ongoing', label: 'Agenda', icon: <RepeatIcon /> },
+  { to: '/plan?tab=routines', label: 'Routines', icon: <RepeatIcon /> },
   { to: '/litters', label: 'Litters', icon: <PawIcon /> },
   { to: '/dogs', label: 'My dogs', icon: <DogIcon /> },
   { to: '/team', label: 'Team & invites', icon: <UsersIcon /> },
@@ -36,7 +36,7 @@ export default function Menu() {
 
   return (
     <div className="p-4 sm:p-6 max-w-lg mx-auto">
-      <PageHeader title="Menu" subtitle={space?.kennel_name || space?.name} />
+      <PageHeader title="Kennel" subtitle={space?.kennel_name || space?.name} />
 
       <Link to="/profile">
         <Card className="p-3.5 flex items-center gap-3 cursor-pointer mb-4">
