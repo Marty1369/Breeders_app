@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
 import { Button, Card, EmptyState, PageHeader, Select, TextField } from '../components/ui';
@@ -8,6 +8,7 @@ import type { OwnerPayment } from '../lib/types';
 
 export default function OwnerRecord() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { owners, puppies, litters } = useSpace();
   const owner = owners.find((o) => o.id === id);
   const puppy = puppies.find((p) => p.owner_id === id);
@@ -20,6 +21,8 @@ export default function OwnerRecord() {
   const [busy, setBusy] = useState(false);
   const [payAmount, setPayAmount] = useState('');
   const [payKind, setPayKind] = useState<'deposit' | 'final'>('deposit');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Hydrate the form once the owner row loads. Without this, a direct URL load
   // (owners not yet fetched) would leave the form blank and Save would overwrite
@@ -79,6 +82,15 @@ export default function OwnerRecord() {
     setPayAmount('');
   }
 
+  // Owner delete. puppies.owner_id is ON DELETE SET NULL, so any linked puppy is
+  // simply unlinked (kept), no cascade of puppy rows.
+  const deleteOwner = async () => {
+    setDeleting(true);
+    await supabase.from('owners').delete().eq('id', owner!.id);
+    setDeleting(false);
+    navigate('/buyers');
+  };
+
   return (
     <div className="p-4 sm:p-6 max-w-lg mx-auto">
       <PageHeader title={owner.name} subtitle={puppy ? `Puppy: ${puppy.name}` : waitingLitter ? `Waiting list — ${waitingLitter.name}` : undefined} />
@@ -127,6 +139,26 @@ export default function OwnerRecord() {
           </Select>
           <Button variant="secondary" onClick={addPayment} disabled={!payAmount}>Add</Button>
         </div>
+      </Card>
+
+      <Card className="p-4 mt-4 border border-[#b93a2e]/25">
+        <div className="text-[11px] font-extrabold text-[#b93a2e] tracking-wide mb-1">DANGER ZONE</div>
+        <p className="text-[12.5px] text-faint mb-3">
+          Delete this buyer. Any puppy linked to them is kept but unlinked. This can't be undone.
+        </p>
+        {!confirmingDelete ? (
+          <Button variant="danger" onClick={() => setConfirmingDelete(true)}>Delete buyer</Button>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <span className="text-[12.5px] font-bold">Delete {owner.name} permanently?</span>
+            <div className="flex gap-2">
+              <Button variant="danger" onClick={deleteOwner} disabled={deleting}>
+                {deleting ? 'Deleting…' : 'Yes, delete buyer'}
+              </Button>
+              <Button variant="ghost" onClick={() => setConfirmingDelete(false)} disabled={deleting}>Cancel</Button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );

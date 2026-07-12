@@ -98,7 +98,7 @@ export default function AppShell() {
     <div className="h-full flex flex-col bg-app-bg text-ink overflow-hidden">
       <div className="flex-1 flex min-h-0">
         {isDesktop && (
-          <div className="w-[248px] flex-none text-white flex flex-col p-3.5 pt-4 overflow-y-auto" style={{ background: '#123f2d' }}>
+          <div data-dark-surface className="w-[248px] flex-none text-white flex flex-col p-3.5 pt-4 overflow-y-auto" style={{ background: '#123f2d' }}>
             <Link to="/" className="flex items-center gap-2.5 px-0.5">
               <Logo size={34} />
               <div>
@@ -152,7 +152,7 @@ export default function AppShell() {
         )}
 
         <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex-none bg-card border-b border-border flex items-center gap-2.5 px-4 py-2.5 min-h-[52px]">
+          <header className="flex-none bg-card border-b border-border flex items-center gap-2.5 px-4 py-2.5 min-h-[52px]">
             {!isDesktop && (
               <Link to="/" className="flex-none">
                 <Logo size={32} />
@@ -178,9 +178,9 @@ export default function AppShell() {
                 <Avatar name={me.name} color={me.avatar_color} size={30} />
               </button>
             )}
-          </div>
+          </header>
 
-          <div className="flex-1 overflow-y-auto min-h-0 pb-16 sm:pb-0">
+          <main className="flex-1 overflow-y-auto min-h-0 pb-16 sm:pb-0">
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/plan" element={<Plan />} />
@@ -219,19 +219,20 @@ export default function AppShell() {
               <Route path="/profile" element={<MyProfile />} />
               <Route path="/search" element={<Search />} />
             </Routes>
-          </div>
+          </main>
         </div>
       </div>
 
       {!isDesktop && (
-        <div className="flex-none bg-card border-t border-border grid grid-cols-4 fixed bottom-0 left-0 right-0 z-30">
+        <nav aria-label="Primary" className="flex-none bg-card border-t border-border grid grid-cols-4 fixed bottom-0 left-0 right-0 z-30" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           {MOBILE_NAV.map((item) => (
             <BottomLink key={item.to} {...item} active={isMobileTabActive(item.to, location.pathname)} />
           ))}
-        </div>
+        </nav>
       )}
 
-      {!isDesktop && activeLitter && (
+      {/* Hide the FAB where a screen has its own sticky primary action bar. */}
+      {!isDesktop && activeLitter && location.pathname !== '/weigh-in' && (
         <button
           aria-label="Add to this litter"
           onClick={() => setFabOpen(true)}
@@ -250,9 +251,8 @@ export default function AppShell() {
             <div className="grid grid-cols-2 gap-2">
               {[
                 { label: 'Task', run: () => setNewTaskOpen(true) },
-                { label: 'Weight', run: () => navigate('/weigh-in') },
+                { label: 'Weigh-in', run: () => navigate('/weigh-in') },
                 { label: 'Expense', run: () => navigate('/expenses') },
-                { label: 'Note', run: () => setNewTaskOpen(true) },
               ].map((o) => (
                 <button
                   key={o.label}
@@ -330,8 +330,8 @@ function SideLink({ to, label, icon, end }: NavItem) {
 
 function BottomLink({ to, label, icon, active }: NavItem & { active: boolean }) {
   return (
-    <Link to={to} className={`flex flex-col items-center justify-center gap-0.5 py-1.5 ${active ? 'text-accent' : 'text-muted'}`}>
-      <span className="grid place-items-center h-[22px]">{icon}</span>
+    <Link to={to} aria-current={active ? 'page' : undefined} className={`flex flex-col items-center justify-center gap-0.5 py-1.5 ${active ? 'text-accent' : 'text-muted'}`}>
+      <span className="grid place-items-center h-[22px]" aria-hidden="true">{icon}</span>
       <span className="text-[10px] font-bold">{label}</span>
     </Link>
   );

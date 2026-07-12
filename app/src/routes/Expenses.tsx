@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
+import { supabase } from '../lib/supabase';
 import { Button, Card, EmptyState, PageHeader } from '../components/ui';
 import { longDate } from '../lib/dates';
 import AddExpenseSheet from '../components/AddExpenseSheet';
@@ -32,6 +33,7 @@ export default function Expenses() {
   const { litters, activeLitterId, expenses, payers, puppies } = useSpace();
   const [params, setParams] = useSearchParams();
   const [addOpen, setAddOpen] = useState(params.get('new') === '1');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const litter = litters.find((l) => l.id === activeLitterId);
   const litterExpenses = expenses.filter((e) => e.litter_id === activeLitterId);
 
@@ -68,6 +70,11 @@ export default function Expenses() {
     a.download = `${litter?.name || 'expenses'}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function deleteExpense(expenseId: string) {
+    setConfirmDeleteId(null);
+    await supabase.from('expenses').delete().eq('id', expenseId);
   }
 
   function closeSheet() {
@@ -137,12 +144,29 @@ export default function Expenses() {
               </div>
               <div className="flex flex-col gap-1.5">
                 {items.map((e) => (
-                  <Card key={e.id} className="p-3 flex items-center justify-between">
+                  <Card key={e.id} className="p-3 flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <div className="text-[12.5px] font-bold truncate">{e.description}</div>
                       <div className="text-[10.5px] text-faint font-semibold">{CAT_LABEL[e.category]} · {longDate(e.date)} · {payers.find((p) => p.id === e.payer_id)?.label || 'Unassigned'}</div>
                     </div>
-                    <div className="text-[13.5px] font-extrabold flex-none">€{e.amount_eur.toFixed(0)}</div>
+                    {confirmDeleteId === e.id ? (
+                      <div className="flex items-center gap-2 flex-none">
+                        <button onClick={() => deleteExpense(e.id)} className="text-[11px] font-extrabold text-danger cursor-pointer">Delete</button>
+                        <button onClick={() => setConfirmDeleteId(null)} className="text-[11px] font-extrabold text-faint cursor-pointer">Cancel</button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2.5 flex-none">
+                        <div className="text-[13.5px] font-extrabold">€{e.amount_eur.toFixed(0)}</div>
+                        <button
+                          onClick={() => setConfirmDeleteId(e.id)}
+                          className="text-[15px] text-faint hover:text-danger cursor-pointer"
+                          title="Delete expense"
+                          aria-label={`Delete ${e.description}`}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )}
                   </Card>
                 ))}
               </div>

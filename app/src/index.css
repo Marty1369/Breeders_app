@@ -10,13 +10,14 @@
   --color-card-border: #ebebe6;
   --color-border: #e7e5de;
   --color-border-soft: #f1f1ec;
+  --color-border-strong: #d3d6cd;
   --color-muted-bg: #f7f8f5;
   --color-chip-bg: #eef0ec;
 
-  /* text */
+  /* text — tuned to clear WCAG AA (4.5:1) on white cards and the app bg */
   --color-ink: #191c1a;
-  --color-muted: #6b7370;
-  --color-faint: #8a938e;
+  --color-muted: #5a625c;
+  --color-faint: #6f766f;
 
   /* brand */
   --color-accent: #17805a;
@@ -24,8 +25,8 @@
   --color-accent-soft: #e3f1ea;
   --color-accent-softer: #b9d8c9;
 
-  /* status */
-  --color-amber: #b97324;
+  /* status — amber darkened for legible warning text (AA); soft stays for fills */
+  --color-amber: #8a5210;
   --color-amber-soft: #d9a05c;
   --color-danger: #b93a2e;
   --color-danger-soft: #f6e6e3;
@@ -63,6 +64,28 @@ input:focus, select:focus, textarea:focus {
   outline: 2px solid var(--color-accent);
   outline-offset: 1px;
   border-radius: 6px;
+}
+
+/* Visible keyboard focus for every interactive element (Tailwind preflight
+   removes the UA default; only inputs had a ring before). */
+:where(a, button, [role="button"], [role="checkbox"], [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+/* On the dark green sidebar, the accent ring is too low-contrast — go light. */
+[data-dark-surface] :focus-visible {
+  outline-color: #7fd4ae;
+}
+
+/* Honour reduced-motion: neutralise the pulsing dot, spinners, transitions. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 * {

@@ -271,29 +271,15 @@ function GanttChart({
             ))}
           </svg>
 
-          {/* rows */}
-          {entries.map((e, i) => {
-            if (e.kind === 'phase') {
-              return (
-                <div key={`p${i}`} className="absolute font-extrabold text-[11px]" style={{ left: 8, top: e.y + 6, color: PHASE_COLOR[e.phase] }}>
-                  {PHASE_LABEL[e.phase]}
-                </div>
-              );
-            }
+          {/* Bars */}
+          {entries.map((e) => {
+            if (e.kind !== 'task') return null;
             const t = e.task!;
             const x = xOf(t.start_date);
             const w = Math.max(DAY_W, (diffDays(t.start_date, t.due_date ?? t.start_date) + 1) * DAY_W);
             const style = barStyle(t, e.phase, today);
             return (
               <div key={t.id}>
-                <button
-                  className={`absolute text-[12px] font-semibold truncate cursor-pointer hover:text-accent text-left ${style.done ? 'text-faint line-through' : ''}`}
-                  style={{ left: 8, top: e.y + 6, width: NAME_W - 14 }}
-                  onClick={() => onOpen(t)}
-                  title={t.name}
-                >
-                  {t.name}
-                </button>
                 <button
                   onClick={() => onOpen(t)}
                   className="absolute rounded-[6px] cursor-pointer flex items-center gap-1 px-1.5 overflow-hidden z-[5]"
@@ -319,6 +305,29 @@ function GanttChart({
               </div>
             );
           })}
+
+          {/* Frozen task-name column — sticky-left so labels stay visible when
+              you scroll the chart horizontally on a phone. */}
+          <div style={{ position: 'sticky', left: 0, width: NAME_W, height, zIndex: 16 }}>
+            <div className="absolute inset-0 bg-card border-r border-border-soft" />
+            {entries.map((e, i) =>
+              e.kind === 'phase' ? (
+                <div key={`pn${i}`} className="absolute font-extrabold text-[11px]" style={{ left: 8, top: e.y + 6, color: PHASE_COLOR[e.phase] }}>
+                  {PHASE_LABEL[e.phase]}
+                </div>
+              ) : (
+                <button
+                  key={`n${e.task!.id}`}
+                  onClick={() => onOpen(e.task!)}
+                  title={e.task!.name}
+                  className={`absolute text-[12px] font-semibold truncate cursor-pointer hover:text-accent text-left ${e.task!.status === 'done' ? 'text-faint line-through' : ''}`}
+                  style={{ left: 8, top: e.y + 6, width: NAME_W - 14 }}
+                >
+                  {e.task!.name}
+                </button>
+              ),
+            )}
+          </div>
         </div>
       </div>
     </div>

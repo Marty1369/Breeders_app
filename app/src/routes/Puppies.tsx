@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
-import { Card, Chip, EmptyState, PageHeader } from '../components/ui';
+import { Card, Chip, CollarAvatar, EmptyState, PageHeader } from '../components/ui';
 import { hasWeightAlert } from '../lib/scheduling';
 import type { Puppy, PuppyStatus } from '../lib/types';
 
@@ -53,15 +53,15 @@ export default function Puppies() {
               .find((v) => v != null);
             return (
               <Card key={p.id} onClick={() => navigate(`/puppies/${p.id}`)} className="p-3.5 cursor-pointer flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-muted-bg grid place-items-center text-[18px] flex-none">
-                  {p.sex === 'female' ? '♀' : p.sex === 'male' ? '♂' : '🐾'}
-                </div>
+                <CollarAvatar name={p.name} collar={p.collar_color} size={48} className="flex-none" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="text-[13.5px] font-extrabold truncate">{p.name}</span>
                     {alert && <span title="Flat weight gain">⚠️</span>}
                   </div>
-                  <div className="text-[10.5px] text-faint font-semibold truncate">{p.color || '—'}{latestWeight ? ` · ${latestWeight}g` : ''}</div>
+                  <div className="text-[10.5px] text-faint font-semibold truncate">
+                    {p.sex === 'female' ? '♀' : p.sex === 'male' ? '♂' : '🐾'} · {p.color || '—'}{latestWeight ? ` · ${latestWeight}g` : ''}
+                  </div>
                   <div className="mt-1"><Chip tone={STATUS_TONE[p.status]}>{p.status}</Chip></div>
                 </div>
                 <Sparkline weighLog={p.weigh_log} />

@@ -12,6 +12,8 @@ export default function Docs() {
   const fileInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
   const litter = litters.find((l) => l.id === activeLitterId);
   const litterUploads = uploads
     .filter((u) => u.litter_id === activeLitterId)
@@ -42,6 +44,7 @@ export default function Docs() {
   }
 
   async function deleteUpload(id: string, pathInBucket: string) {
+    setConfirmDeleteId(null);
     await supabase.storage.from('space-files').remove([pathInBucket]);
     await supabase.from('uploads').delete().eq('id', id);
   }
@@ -81,17 +84,31 @@ export default function Docs() {
                 <div className="text-[12.5px] font-bold truncate text-accent">{u.name}</div>
                 <div className="text-[10.5px] text-faint font-semibold">{longDate(u.created_at.slice(0, 10))}</div>
               </button>
-              <button onClick={() => downloadUpload(u.file)} className="text-[11px] font-extrabold text-accent cursor-pointer px-2 py-1">
-                Download
-              </button>
-              <button
-                onClick={() => { if (confirm(`Delete "${u.name}"?`)) deleteUpload(u.id, u.file); }}
-                className="text-[15px] text-faint hover:text-danger cursor-pointer px-1"
-                title="Delete"
-                aria-label={`Delete ${u.name}`}
-              >
-                ×
-              </button>
+              {confirmDeleteId === u.id ? (
+                <div className="flex items-center gap-2 flex-none">
+                  <span className="text-[11px] font-bold text-danger">Delete?</span>
+                  <button onClick={() => deleteUpload(u.id, u.file)} className="text-[11px] font-extrabold text-danger cursor-pointer">
+                    Confirm
+                  </button>
+                  <button onClick={() => setConfirmDeleteId(null)} className="text-[11px] font-extrabold text-faint cursor-pointer">
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button onClick={() => downloadUpload(u.file)} className="text-[11px] font-extrabold text-accent cursor-pointer px-2 py-1">
+                    Download
+                  </button>
+                  <button
+                    onClick={() => setConfirmDeleteId(u.id)}
+                    className="text-[15px] text-faint hover:text-danger cursor-pointer px-1"
+                    title="Delete"
+                    aria-label={`Delete ${u.name}`}
+                  >
+                    ×
+                  </button>
+                </>
+              )}
             </Card>
           ))}
         </div>

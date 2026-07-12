@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { Card, EmptyState, PageHeader, TextField } from '../components/ui';
 import { DOC_TYPE_LABEL } from '../lib/documents';
 
 export default function Search() {
-  const { puppies, owners, tasks, documents, litters } = useSpace();
+  const { puppies, owners, tasks, documents, litters, setActiveLitterId } = useSpace();
+  const navigate = useNavigate();
   const [q, setQ] = useState('');
   const query = q.trim().toLowerCase();
 
@@ -21,6 +22,18 @@ export default function Search() {
     };
   }, [query, puppies, owners, tasks, documents, litters]);
 
+  const noMatches =
+    results !== null &&
+    results.puppies.length === 0 &&
+    results.owners.length === 0 &&
+    results.tasks.length === 0 &&
+    results.documents.length === 0;
+
+  const openTask = (litterId: string) => {
+    setActiveLitterId(litterId);
+    navigate('/plan');
+  };
+
   return (
     <div className="p-4 sm:p-6 max-w-lg mx-auto">
       <PageHeader title="Search" />
@@ -28,6 +41,8 @@ export default function Search() {
 
       {!results ? (
         <EmptyState title="Search across your whole kennel space" subtitle="Puppies, owners, tasks, and documents — across every litter." />
+      ) : noMatches ? (
+        <EmptyState title={`No matches for “${q.trim()}”`} subtitle="Try a different name or keyword." />
       ) : (
         <div className="flex flex-col gap-5">
           <ResultGroup title="Puppies">
@@ -51,10 +66,12 @@ export default function Search() {
           </ResultGroup>
           <ResultGroup title="Tasks">
             {results.tasks.map((t) => (
-              <Card key={t.id} className="p-3">
-                <div className="text-[12.5px] font-extrabold">{t.name}</div>
-                <div className="text-[10.5px] text-faint font-semibold">{results.litterName(t.litter_id)} · {t.start_date}</div>
-              </Card>
+              <button key={t.id} type="button" onClick={() => openTask(t.litter_id)} className="text-left w-full">
+                <Card className="p-3 cursor-pointer">
+                  <div className="text-[12.5px] font-extrabold">{t.name}</div>
+                  <div className="text-[10.5px] text-faint font-semibold">{results.litterName(t.litter_id)} · {t.start_date}</div>
+                </Card>
+              </button>
             ))}
           </ResultGroup>
           <ResultGroup title="Documents">

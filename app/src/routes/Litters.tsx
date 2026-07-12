@@ -100,10 +100,16 @@ export default function Litters() {
                       return (
                         <Card
                           key={l.id}
-                          className={`relative p-4 cursor-pointer hover:border-border-strong transition-colors ${isActive(l) || terminal ? '' : 'opacity-70'}`}
-                          onClick={() => open(l)}
+                          className={`relative p-4 hover:border-border-strong transition-colors ${isActive(l) || terminal ? '' : 'opacity-70'}`}
                         >
-                          <div className="flex items-start justify-between gap-2">
+                          {/* Stretched button: whole card opens the litter, keyboard-accessible,
+                              without nesting the overflow menu inside a button. */}
+                          <button
+                            onClick={() => open(l)}
+                            aria-label={`Open ${l.name}`}
+                            className="absolute inset-0 rounded-[inherit] cursor-pointer"
+                          />
+                          <div className="relative flex items-start justify-between gap-2 pointer-events-none">
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-[15px] font-extrabold">{l.name}</span>
@@ -112,11 +118,11 @@ export default function Litters() {
                               </div>
                               <div className="text-[11.5px] text-faint font-semibold mt-0.5">{dogName(l.dam_id)} × {dogName(l.sire_id)}</div>
                             </div>
-                            {/* Overflow menu (shelve / unshelve) */}
-                            <div className="relative flex-none">
+                            {/* Overflow menu — re-enable pointer events above the stretched button */}
+                            <div className="relative flex-none pointer-events-auto">
                               <button
                                 aria-label="Litter options"
-                                onClick={(e) => { e.stopPropagation(); setMenuId(menuId === l.id ? null : l.id); }}
+                                onClick={() => setMenuId(menuId === l.id ? null : l.id)}
                                 className="w-8 h-8 grid place-items-center rounded-full text-muted hover:bg-muted-bg cursor-pointer text-[18px] leading-none"
                               >
                                 ⋯
@@ -136,7 +142,7 @@ export default function Litters() {
                               )}
                             </div>
                           </div>
-                          <div className="text-[11.5px] text-muted font-semibold mt-2">
+                          <div className="relative text-[11.5px] text-muted font-semibold mt-2 pointer-events-none">
                             {whelping ? `Whelping ${niceDate(whelping)}` : 'Not whelped'}{handover ? ` · handover ${niceDate(handover)}` : ''}
                             {' · '}{nPups} pup{nPups === 1 ? '' : 's'} · {nTasks} open task{nTasks === 1 ? '' : 's'}
                           </div>

@@ -36,6 +36,7 @@ export default function WeighIn() {
   const [saved, setSaved] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const [alerted, setAlerted] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Reset optimistic saves + focus when the session (AM/PM) flips.
   useEffect(() => {
@@ -43,6 +44,7 @@ export default function WeighIn() {
     setFocusId(null);
     setInput('');
     setAlerted(false);
+    setSaveError(null);
   }, [session]);
 
   if (!litter) {
@@ -87,7 +89,13 @@ export default function WeighIn() {
     setBusy(true);
     const grams = Math.round(typed!);
     const weigh_log = { ...focusPup.weigh_log, [today]: { ...focusPup.weigh_log[today], [session]: grams } };
-    await supabase.from('puppies').update({ weigh_log }).eq('id', focusPup.id);
+    const { error } = await supabase.from('puppies').update({ weigh_log }).eq('id', focusPup.id);
+    if (error) {
+      setSaveError(`Couldn't save ${focusPup.name}'s weight — check your connection and try again.`);
+      setBusy(false);
+      return;
+    }
+    setSaveError(null);
     setSaved((s) => ({ ...s, [focusPup.id]: grams }));
     // Advance to the next still-unweighed puppy (excluding the one just saved).
     const next = litterPuppies.find((p) => p.id !== focusPup.id && !isWeighed(p.id));
@@ -169,11 +177,15 @@ export default function WeighIn() {
             <div className="flex-1 h-[6px] rounded-full bg-chip-bg overflow-hidden">
               <div className="h-full bg-accent rounded-full transition-[width]" style={{ width: `${(doneCount / total) * 100}%` }} />
             </div>
-            <span className="text-[13px] font-extrabold text-muted tabular-nums flex-none">
+            <span aria-live="polite" className="text-[13px] font-extrabold text-muted tabular-nums flex-none">
               {doneCount} of {total}
               {doneCount === total - 1 && <span className="text-accent"> · almost there</span>}
             </span>
           </div>
+
+          {saveError && (
+            <div role="alert" className="mb-4 text-[12.5px] font-bold text-danger bg-danger-soft rounded-[10px] px-3 py-2.5">{saveError}</div>
+          )}
 
           {allDone ? (
             <div className="rounded-[20px] p-6 text-white text-center" style={{ background: '#123f2d' }}>
@@ -210,6 +222,7 @@ export default function WeighIn() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') saveFocused(); }}
+                  aria-label={`${focusPup.name} weight in grams`}
                   className="w-full max-w-[240px] text-center text-[48px] font-extrabold mt-3 px-3 py-1 rounded-[14px] border border-border bg-white text-ink placeholder:text-faint tabular-nums"
                 />
                 {verdict && (
@@ -218,14 +231,14 @@ export default function WeighIn() {
                 {prevWeight != null && (
                   <div className="flex gap-2 mt-3 w-full max-w-[300px]">
                     {QUICK.map((d) => (
-                      <button key={d} onClick={() => setInput(String(prevWeight + d))} className="flex-1 py-2 rounded-full text-[13px] font-extrabold bg-chip-bg text-muted hover:bg-accent-soft hover:text-accent cursor-pointer">+{d} g</button>
+                      <button key={d} onClick={() => setInput(String(prevWeight + d))} className="flex-1 min-h-11 rounded-full text-[13px] font-extrabold bg-chip-bg text-muted hover:bg-accent-soft hover:text-accent cursor-pointer">+{d} g</button>
                     ))}
                   </div>
                 )}
                 <div className="text-[12px] text-faint font-semibold mt-3">Expected at day {ageDays ?? '—'}: roughly +30 to +70 g</div>
                 <div className="flex items-center gap-2 mt-4 w-full">
                   {focusIdx > 0 && (
-                    <button onClick={() => { setFocusId(litterPuppies[focusIdx - 1].id); setInput(''); }} className="px-3 py-2 rounded-[10px] text-[13px] font-extrabold text-muted hover:bg-muted-bg cursor-pointer">‹ Prev</button>
+                    <button onClick={() => { setFocusId(litterPuppies[focusIdx - 1].id); setInput(''); }} className="px-3 min-h-11 rounded-[10px] text-[13px] font-extrabold text-muted hover:bg-muted-bg cursor-pointer">‹ Prev</button>
                   )}
                   <Button onClick={saveFocused} disabled={!inputValid || busy} className="flex-1 !min-h-12">
                     {doneCount === total - 1 ? 'Save · last one!' : 'Save · next ›'}
@@ -267,6 +280,7 @@ export default function WeighIn() {
                           value={input}
                           onChange={(e) => setInput(e.target.value)}
                           onKeyDown={(e) => { if (e.key === 'Enter') saveFocused(); }}
+                          aria-label={`${focusPup.name} weight in grams`}
                           className="w-full text-[34px] font-extrabold px-3 py-1.5 rounded-[12px] border border-border bg-white text-ink placeholder:text-faint tabular-nums"
                         />
                         {verdict && (
@@ -282,7 +296,7 @@ export default function WeighIn() {
                             <button
                               key={d}
                               onClick={() => setInput(String(yst + d))}
-                              className="flex-1 py-2 rounded-full text-[13px] font-extrabold bg-chip-bg text-muted hover:bg-accent-soft hover:text-accent cursor-pointer"
+                              className="flex-1 min-h-11 rounded-full text-[13px] font-extrabold bg-chip-bg text-muted hover:bg-accent-soft hover:text-accent cursor-pointer"
                             >
                               +{d} g
                             </button>

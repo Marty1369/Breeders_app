@@ -36,11 +36,13 @@ export default function DogFormSheet({
   const [form, setForm] = useState(BLANK_DOG_FORM);
   const [busy, setBusy] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   // Hydrate the form from the dog in edit mode; reset to blank (with the default
   // sex) in add mode.
   useEffect(() => {
     if (!open) return;
+    setConfirmingDelete(false);
     if (dog) {
       setForm({
         name: dog.name, sex: dog.sex, breed: dog.breed || '', dob: dog.dob || '',
@@ -101,7 +103,6 @@ export default function DogFormSheet({
   async function remove() {
     if (!dog) return;
     if (litterCount > 0) return; // guarded in UI too
-    if (!confirm(`Delete ${dog.name}? This cannot be undone.`)) return;
     setBusy(true);
     await supabase.from('dogs').delete().eq('id', dog.id);
     setBusy(false);
@@ -198,10 +199,22 @@ export default function DogFormSheet({
               <div className="text-[11px] font-semibold text-faint">
                 Can't delete — this dog is linked to {litterCount} litter{litterCount === 1 ? '' : 's'}.
               </div>
-            ) : (
-              <button onClick={remove} disabled={busy} className="text-[12px] font-extrabold text-danger cursor-pointer">
+            ) : !confirmingDelete ? (
+              <button onClick={() => setConfirmingDelete(true)} disabled={busy} className="text-[12px] font-extrabold text-danger cursor-pointer">
                 Delete dog
               </button>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <span className="text-[12.5px] font-bold">Delete {dog?.name} permanently?</span>
+                <div className="flex gap-2">
+                  <Button variant="danger" size="sm" onClick={remove} disabled={busy}>
+                    {busy ? 'Deleting…' : 'Delete permanently'}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)} disabled={busy}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
         )}

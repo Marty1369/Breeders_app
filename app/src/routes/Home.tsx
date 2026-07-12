@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { useAuth } from '../state/AuthProvider';
-import { Button, Card, CircleCheckbox, EmptyState } from '../components/ui';
+import { Button, Card, CircleCheckbox, EmptyState, safeColor } from '../components/ui';
+import { ScaleIcon } from '../components/icons';
 import { addDays, diffDays, niceDate, parseDate, todayStr } from '../lib/dates';
 import { effectiveDate, hasWeightAlert } from '../lib/scheduling';
 import { litterProgress } from '../lib/stages';
@@ -122,6 +123,7 @@ export default function Home() {
 
   return (
     <div className="max-w-3xl mx-auto pb-24">
+      <h1 className="sr-only">Home — today's plan for {litter ? litter.name : space?.kennel_name || 'your kennel'}</h1>
       {/* Dark header */}
       <div className="text-white px-4 sm:px-6 pt-5 pb-8" style={{ background: '#123f2d' }}>
         <div className="text-[11px] font-extrabold tracking-wide opacity-75">{greeting}{me ? `, ${me.name.split(' ')[0]}` : ''}</div>
@@ -186,8 +188,8 @@ export default function Home() {
                 <Card className="p-4">
                   <div className="text-[11px] font-extrabold tracking-wide text-faint mb-2">UP NEXT</div>
                   <div className="flex items-center gap-3">
-                    <div className="w-[54px] h-[54px] flex-none rounded-[14px] grid place-items-center text-white text-[22px]" style={{ background: weigh ? '#4a6fa5' : '#17805a' }}>
-                      {weigh ? '⚖' : '•'}
+                    <div className="w-[54px] h-[54px] flex-none rounded-[14px] grid place-items-center text-white" style={{ background: weigh ? '#4a6fa5' : '#17805a' }}>
+                      {weigh ? <ScaleIcon size={24} /> : <span className="w-2.5 h-2.5 rounded-full bg-white" />}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-[16px] font-extrabold leading-tight">{name}</div>
@@ -312,16 +314,16 @@ function CheckRow({ done, name, meta, onToggle, onOpen }: { done: boolean; name:
   return (
     <div className="flex items-center gap-3 min-h-[52px] py-1">
       <CircleCheckbox checked={done} size={28} onClick={(e) => { e.stopPropagation(); onToggle(); }} aria-label={done ? `Uncheck ${name}` : `Check ${name}`} />
-      <div className="flex-1 min-w-0 cursor-pointer" onClick={onOpen}>
+      <button className="flex-1 min-w-0 text-left cursor-pointer" onClick={onOpen}>
         <div className={`text-[15px] font-bold truncate ${done ? 'line-through text-faint' : ''}`}>{name}</div>
         <div className="text-[12px] text-faint font-semibold">{meta}</div>
-      </div>
+      </button>
     </div>
   );
 }
 
 function CollarDot({ collar }: { collar: string | null }) {
-  return <span className="w-6 h-6 rounded-full bg-white border-2 border-card" style={{ boxShadow: `inset 0 0 0 3px ${collar || '#cfd4cf'}` }} />;
+  return <span aria-hidden="true" className="w-6 h-6 rounded-full bg-white border-2 border-card" style={{ boxShadow: `inset 0 0 0 3px ${safeColor(collar)}` }} />;
 }
 
 function countAvailable(pups: Puppy[]): number {

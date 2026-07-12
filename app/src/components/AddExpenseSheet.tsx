@@ -26,24 +26,39 @@ export default function AddExpenseSheet({ open, onClose }: { open: boolean; onCl
   const [newPayer, setNewPayer] = useState('');
   const [addingPayer, setAddingPayer] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const amountNum = Number(amount);
+  const amountValid = amount.trim() !== '' && Number.isFinite(amountNum) && amountNum > 0;
 
   async function save() {
-    if (!space || !amount) return;
+    if (!space || !amountValid) return;
     setBusy(true);
+    setError(null);
     let finalPayerId = payerId;
     if (addingPayer && newPayer.trim()) {
-      const { data } = await supabase.from('payers').insert({ space_id: space.id, label: newPayer.trim() }).select('id').single();
+      const { data, error: payerErr } = await supabase.from('payers').insert({ space_id: space.id, label: newPayer.trim() }).select('id').single();
+      if (payerErr) {
+        setError(payerErr.message || 'Could not add payer. Try again.');
+        setBusy(false);
+        return;
+      }
       finalPayerId = data?.id || '';
     }
-    await supabase.from('expenses').insert({
+    const { error: insertErr } = await supabase.from('expenses').insert({
       space_id: space.id,
       litter_id: activeLitterId,
       date,
       description: desc || CATS.find((c) => c.value === cat)?.label || 'Expense',
       category: cat,
-      amount_eur: Number(amount),
+      amount_eur: amountNum,
       payer_id: finalPayerId || null,
     });
+    if (insertErr) {
+      setError(insertErr.message || 'Could not save the expense. Try again.');
+      setBusy(false);
+      return;
+    }
     setBusy(false);
     setDesc('');
     setAmount('');
@@ -60,11 +75,12 @@ export default function AddExpenseSheet({ open, onClose }: { open: boolean; onCl
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={busy || !amount}>{busy ? 'Saving…' : 'Save'}</Button>
+          <Button onClick={save} disabled={busy || !amountValid}>{busy ? 'Saving…' : 'Save'}</Button>
         </>
       }
     >
       <div className="flex flex-col gap-3">
+        {error && <div className="text-[12px] font-bold text-danger">{error}</div>}
         <TextField label="Description" value={desc} onChange={(e) => setDesc(e.target.value)} />
         <div className="grid grid-cols-2 gap-3">
           <TextField label="Amount (€)" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus />

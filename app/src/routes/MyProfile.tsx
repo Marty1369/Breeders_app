@@ -39,6 +39,10 @@ export default function MyProfile() {
     await supabase.auth.signOut();
   }
 
+  async function signOutEverywhere() {
+    await supabase.auth.signOut({ scope: 'global' });
+  }
+
   const deleteAccount = async () => {
     setDeleting(true);
     setDeleteError(null);
@@ -104,9 +108,10 @@ export default function MyProfile() {
         </div>
       </Card>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button onClick={save} disabled={busy || !hydrated}>{busy ? 'Saving…' : 'Save'}</Button>
         <Button variant="ghost" onClick={signOut}>Sign out</Button>
+        <Button variant="ghost" onClick={signOutEverywhere}>Sign out everywhere</Button>
       </div>
 
       <Card className="p-4 mt-6 border border-[#b93a2e]/25">

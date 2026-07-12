@@ -203,28 +203,24 @@ export default function Timeline({ mode = 'both', embedded = false }: { mode?: '
     const relColor = rel.tone === 'late' ? 'text-danger' : rel.tone === 'soon' ? 'text-[#b7791b]' : 'text-faint';
     return (
       <div
-        onClick={onOpen}
-        className="flex items-center gap-3 pl-3 pr-3 py-3 min-h-[56px] bg-card border border-card-border rounded-[14px] cursor-pointer hover:border-border-strong transition-colors"
+        className="flex items-center gap-3 pl-3 pr-3 py-3 min-h-[56px] bg-card border border-card-border rounded-[14px] hover:border-border-strong transition-colors"
         style={{ boxShadow: 'inset 3px 0 0 0 ' + stripe }}
       >
         <CircleCheckbox
           checked={done}
           size={28}
-          onClick={(e) => {
-            e.stopPropagation();
-            done ? onOpen() : onComplete();
-          }}
+          onClick={() => (done ? onOpen() : onComplete())}
           aria-label={done ? `Reopen ${task.name}` : `Complete ${task.name}`}
         />
-        <div className="flex-1 min-w-0">
+        <button onClick={onOpen} className="flex-1 min-w-0 text-left cursor-pointer">
           <div className={`text-[15px] font-bold truncate ${done ? 'line-through text-faint' : ''}`}>{task.name}</div>
           <div className="flex items-center gap-1.5 mt-0.5 text-[12px] font-semibold flex-wrap">
             <span className={relColor}>{rel.label}</span>
             {framing && <><span className="text-border-strong">·</span><span className="text-faint">{framing}</span></>}
             {task.is_pinned_date && <span className="text-faint">· pinned</span>}
           </div>
-        </div>
-        <div className="flex -space-x-1.5 flex-none">
+        </button>
+        <div className="flex -space-x-1.5 flex-none" aria-hidden="true">
           {assignees.slice(0, 3).map((m) => (
             <Avatar key={m.user_id} name={m.name} color={m.avatar_color} size={24} />
           ))}

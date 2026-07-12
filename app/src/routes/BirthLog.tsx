@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSpace } from '../state/SpaceProvider';
 import { useAuth } from '../state/AuthProvider';
-import { Button, Card, Chip, EmptyState, PageHeader, Select, Sheet, TextField } from '../components/ui';
+import { Button, Card, Chip, EmptyState, PageHeader, Select, Sheet, TextField, safeColor } from '../components/ui';
 import { longDate, todayStr } from '../lib/dates';
 import { cascadePreview, recomputeLitterDates, setActualDate } from '../lib/scheduling';
 import { startWhelping, logBirth, saveBirthDetails, finishWhelping } from '../lib/actions';
@@ -149,7 +149,7 @@ export default function BirthLog() {
                     >
                       <div
                         className="w-9 h-9 flex-none rounded-full grid place-items-center text-[12px] font-extrabold text-white"
-                        style={{ boxShadow: `inset 0 0 0 3px ${e.collar_color || 'rgba(255,255,255,0.3)'}` }}
+                        style={{ boxShadow: `inset 0 0 0 3px ${safeColor(e.collar_color, 'rgba(255,255,255,0.3)')}` }}
                       >
                         {e.seq}
                       </div>
