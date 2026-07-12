@@ -76,25 +76,49 @@ function TeamTab() {
 }
 
 function OwnersTab() {
-  const { owners, litters, puppies } = useSpace();
+  const { owners, litters, puppies, activeLitterId } = useSpace();
   const [search, setSearch] = useState('');
   const [litterFilter, setLitterFilter] = useState('');
   const [waitingOnly, setWaitingOnly] = useState(false);
   const [missingOnly, setMissingOnly] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  // "This litter" = owners tied to the active litter (buyer of one of its pups,
+  // or on its waiting list). "All litters" = every owner in the space.
+  const [scope, setScope] = useState<'litter' | 'all'>('litter');
+  const effectiveScope = activeLitterId ? scope : 'all';
+
+  // Owner ids that bought a puppy in the active litter.
+  const activeLitterOwnerIds = useMemo(
+    () => new Set(puppies.filter((p) => p.litter_id === activeLitterId && p.owner_id).map((p) => p.owner_id)),
+    [puppies, activeLitterId],
+  );
 
   const filtered = useMemo(() => {
     return owners.filter((o) => {
+      if (effectiveScope === 'litter' && !(activeLitterOwnerIds.has(o.id) || o.waiting_list_for === activeLitterId))
+        return false;
       if (search && !o.name.toLowerCase().includes(search.toLowerCase())) return false;
       if (litterFilter && o.waiting_list_for !== litterFilter) return false;
       if (waitingOnly && !o.waiting_list_for) return false;
       if (missingOnly && o.address && o.phone && o.email) return false;
       return true;
     });
-  }, [owners, search, litterFilter, waitingOnly, missingOnly]);
+  }, [owners, search, litterFilter, waitingOnly, missingOnly, effectiveScope, activeLitterOwnerIds, activeLitterId]);
 
   return (
     <div>
+      {activeLitterId && (
+        <div className="mb-4">
+          <SegmentedControl
+            value={effectiveScope}
+            onChange={setScope}
+            options={[
+              { value: 'litter', label: 'This litter' },
+              { value: 'all', label: 'All litters' },
+            ]}
+          />
+        </div>
+      )}
       <div className="flex flex-col gap-2.5 mb-4">
         <div className="flex gap-2">
           <TextField className="flex-1" placeholder="Search owners…" value={search} onChange={(e) => setSearch(e.target.value)} />

@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
-import { Card, Chip, EmptyState, PageHeader } from '../components/ui';
+import { Card, Chip, CollarAvatar, EmptyState, PageHeader } from '../components/ui';
 import { hasWeightAlert } from '../lib/scheduling';
 import type { Puppy, PuppyStatus } from '../lib/types';
 
@@ -30,6 +30,21 @@ function Sparkline({ weighLog }: { weighLog: Puppy['weigh_log'] }) {
   );
 }
 
+/** Average daily gain (g/day) across a puppy's weigh_log: latest reading minus
+ *  earliest, over the number of days between them. Null until 2+ dated readings. */
+function gramsPerDay(weighLog: Puppy['weigh_log']): number | null {
+  const days = Object.keys(weighLog).sort();
+  const reads = days
+    .map((d) => ({ date: d, g: weighLog[d].pm ?? weighLog[d].am }))
+    .filter((r): r is { date: string; g: number } => r.g != null);
+  if (reads.length < 2) return null;
+  const first = reads[0];
+  const last = reads[reads.length - 1];
+  const spanDays = (Date.parse(last.date) - Date.parse(first.date)) / 86400000;
+  if (spanDays <= 0) return null;
+  return Math.round((last.g - first.g) / spanDays);
+}
+
 export default function Puppies() {
   const { litters, activeLitterId, puppies } = useSpace();
   const navigate = useNavigate();
@@ -51,18 +66,29 @@ export default function Puppies() {
               .reverse()
               .map((d) => p.weigh_log[d].pm ?? p.weigh_log[d].am)
               .find((v) => v != null);
+            const gpd = gramsPerDay(p.weigh_log);
             return (
-              <Card key={p.id} onClick={() => navigate(`/puppies/${p.id}`)} className="p-3.5 cursor-pointer flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-muted-bg grid place-items-center text-[18px] flex-none">
-                  {p.sex === 'female' ? '♀' : p.sex === 'male' ? '♂' : '🐾'}
-                </div>
+              <Card
+                key={p.id}
+                onClick={() => navigate(`/puppies/${p.id}`)}
+                className="p-3.5 cursor-pointer flex items-center gap-3"
+                style={alert ? { borderColor: '#d9a05c', borderWidth: 2 } : undefined}
+              >
+                <CollarAvatar name={p.name} collar={p.collar_color} size={48} className="flex-none" />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[13.5px] font-extrabold truncate">{p.name}</span>
-                    {alert && <span title="Flat weight gain">⚠️</span>}
+                  <div className="text-[15px] font-extrabold truncate">{p.name}</div>
+                  <div className="text-[12px] text-faint font-semibold truncate">
+                    {p.sex === 'female' ? '♀' : p.sex === 'male' ? '♂' : '—'} · {p.color || '—'}{latestWeight ? ` · ${latestWeight} g` : ''}
                   </div>
-                  <div className="text-[10.5px] text-faint font-semibold truncate">{p.color || '—'}{latestWeight ? ` · ${latestWeight}g` : ''}</div>
-                  <div className="mt-1"><Chip tone={STATUS_TONE[p.status]}>{p.status}</Chip></div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Chip tone={STATUS_TONE[p.status]}>{p.status}</Chip>
+                    {gpd != null && (
+                      <span className={`text-[12px] font-extrabold ${gpd < 0 ? 'text-danger' : 'text-accent'}`}>
+                        {gpd >= 0 ? '+' : '−'}{Math.abs(gpd)} g/day {gpd > 0 ? '↑' : gpd < 0 ? '↓' : ''}
+                      </span>
+                    )}
+                  </div>
+                  {alert && <div className="text-[12px] font-extrabold text-amber mt-1">flat gain — watch</div>}
                 </div>
                 <Sparkline weighLog={p.weigh_log} />
               </Card>

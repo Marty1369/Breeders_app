@@ -6,13 +6,7 @@ import { Avatar, Button, Chip, Sheet, TextField } from '../ui';
 import { longDate, todayStr } from '../../lib/dates';
 import { markTaskDone } from '../../lib/actions';
 import type { Task } from '../../lib/types';
-
-const PHASE_LABEL: Record<string, string> = {
-  prewhelp: 'Pre-whelp',
-  t1_birth: 'Birth (T1)',
-  t2_wean: 'Weaning (T2)',
-  t3_social: 'Socialization (T3)',
-};
+import { STAGE_LABEL as PHASE_LABEL } from '../../lib/stages';
 
 export default function TaskDetailSheet({
   task,

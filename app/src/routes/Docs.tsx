@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
-import { Button, Card, EmptyState, PageHeader } from '../components/ui';
+import { Button, Card, EmptyState, PageHeader, SegmentedControl } from '../components/ui';
 import { longDate } from '../lib/dates';
 
 // Documents = a simple list of files stored with the litter: upload, store,
@@ -11,10 +11,16 @@ export default function Docs() {
   const { space, activeLitterId, litters, uploads } = useSpace();
   const fileInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  // "This litter" (active-litter filtered) vs "All litters" (every doc in the space).
+  const [scope, setScope] = useState<'litter' | 'all'>('litter');
+
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const litter = litters.find((l) => l.id === activeLitterId);
-  const litterUploads = uploads
-    .filter((u) => u.litter_id === activeLitterId)
+  // No active litter → nothing to scope to, so fall back to showing everything.
+  const effectiveScope = activeLitterId ? scope : 'all';
+  const visibleUploads = uploads
+    .filter((u) => effectiveScope === 'all' || u.litter_id === activeLitterId)
     .slice()
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
 
@@ -42,6 +48,7 @@ export default function Docs() {
   }
 
   async function deleteUpload(id: string, pathInBucket: string) {
+    setConfirmDeleteId(null);
     await supabase.storage.from('space-files').remove([pathInBucket]);
     await supabase.from('uploads').delete().eq('id', id);
   }
@@ -68,30 +75,64 @@ export default function Docs() {
         }}
       />
 
-      {litterUploads.length === 0 ? (
+      {activeLitterId && (
+        <div className="mb-4">
+          <SegmentedControl
+            value={effectiveScope}
+            onChange={setScope}
+            options={[
+              { value: 'litter', label: 'This litter' },
+              { value: 'all', label: 'All litters' },
+            ]}
+          />
+        </div>
+      )}
+
+      {visibleUploads.length === 0 ? (
         <EmptyState
           title="No documents yet"
           subtitle="Upload contracts, pedigrees, or health certificates to keep them with this litter."
         />
       ) : (
         <div className="flex flex-col gap-1.5">
-          {litterUploads.map((u) => (
+          {visibleUploads.map((u) => (
             <Card key={u.id} className="p-3 flex items-center justify-between gap-2">
               <button onClick={() => downloadUpload(u.file)} className="flex-1 min-w-0 text-left cursor-pointer" title="Download">
                 <div className="text-[12.5px] font-bold truncate text-accent">{u.name}</div>
-                <div className="text-[10.5px] text-faint font-semibold">{longDate(u.created_at.slice(0, 10))}</div>
+                <div className="text-[10.5px] text-faint font-semibold">
+                  {[
+                    effectiveScope === 'all' ? litters.find((l) => l.id === u.litter_id)?.name : null,
+                    longDate(u.created_at.slice(0, 10)),
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </div>
               </button>
-              <button onClick={() => downloadUpload(u.file)} className="text-[11px] font-extrabold text-accent cursor-pointer px-2 py-1">
-                Download
-              </button>
-              <button
-                onClick={() => { if (confirm(`Delete "${u.name}"?`)) deleteUpload(u.id, u.file); }}
-                className="text-[15px] text-faint hover:text-danger cursor-pointer px-1"
-                title="Delete"
-                aria-label={`Delete ${u.name}`}
-              >
-                ×
-              </button>
+              {confirmDeleteId === u.id ? (
+                <div className="flex items-center gap-2 flex-none">
+                  <span className="text-[11px] font-bold text-danger">Delete?</span>
+                  <button onClick={() => deleteUpload(u.id, u.file)} className="text-[11px] font-extrabold text-danger cursor-pointer">
+                    Confirm
+                  </button>
+                  <button onClick={() => setConfirmDeleteId(null)} className="text-[11px] font-extrabold text-faint cursor-pointer">
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button onClick={() => downloadUpload(u.file)} className="text-[11px] font-extrabold text-accent cursor-pointer px-2 py-1">
+                    Download
+                  </button>
+                  <button
+                    onClick={() => setConfirmDeleteId(u.id)}
+                    className="text-[15px] text-faint hover:text-danger cursor-pointer px-1"
+                    title="Delete"
+                    aria-label={`Delete ${u.name}`}
+                  >
+                    ×
+                  </button>
+                </>
+              )}
             </Card>
           ))}
         </div>

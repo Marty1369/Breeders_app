@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
-import { Button, Card, Chip, EmptyState, PageHeader, Toggle } from '../components/ui';
+import { Button, Card, Chip, EmptyState, PageHeader } from '../components/ui';
+import { PlusIcon } from '../components/icons';
 import { niceDate } from '../lib/dates';
 import { effectiveDate } from '../lib/scheduling';
 import type { Dog, Litter, LitterStatus } from '../lib/types';
@@ -20,9 +21,10 @@ export default function Litters() {
   const { litters, dogs, tasks, puppies, activeLitterId, setActiveLitterId } = useSpace();
   const navigate = useNavigate();
 
-  // Optimistic active-state so the toggle responds instantly instead of waiting
-  // for the realtime round-trip. Cleared per-litter once the server value catches up.
+  // Optimistic active-state so shelve/unshelve responds instantly instead of
+  // waiting for the realtime round-trip. Cleared once the server value catches up.
   const [pending, setPending] = useState<Record<string, boolean>>({});
+  const [menuId, setMenuId] = useState<string | null>(null);
   useEffect(() => {
     setPending((p) => {
       let changed = false;
@@ -40,15 +42,15 @@ export default function Litters() {
 
   const dogName = (id: string | null) => dogs.find((d: Dog) => d.id === id)?.name ?? '—';
 
-  const activeLitters = litters.filter((l) => isActive(l) && !isTerminal(l));
   const groups: { title: string; hint?: string; items: Litter[] }[] = [
-    { title: 'Active', hint: 'Shown on the dashboard and switcher', items: activeLitters },
-    { title: 'Inactive', hint: 'Shelved — kept, but out of the way', items: litters.filter((l) => !isActive(l) && !isTerminal(l)) },
+    { title: 'Active', hint: 'On the dashboard and switcher', items: litters.filter((l) => isActive(l) && !isTerminal(l)) },
+    { title: 'Shelved', hint: 'Kept, but out of the way', items: litters.filter((l) => !isActive(l) && !isTerminal(l)) },
     { title: 'Archive', hint: 'Closed or did-not-take', items: litters.filter(isTerminal) },
   ];
 
   async function setActive(litter: Litter, active: boolean) {
-    setPending((p) => ({ ...p, [litter.id]: active })); // instant feedback
+    setMenuId(null);
+    setPending((p) => ({ ...p, [litter.id]: active }));
     const { error } = await supabase.from('litters').update({ is_active: active }).eq('id', litter.id);
     if (error) {
       setPending((p) => {
@@ -59,19 +61,24 @@ export default function Litters() {
       return;
     }
     if (!active && litter.id === activeLitterId) {
-      // deactivating the current litter → hand focus to another active one
       const next = litters.find((l) => l.id !== litter.id && isActive(l) && !isTerminal(l));
       setActiveLitterId(next?.id ?? null);
     }
     if (active && !activeLitterId) setActiveLitterId(litter.id);
   }
 
+  // Whole card opens the litter (the only focus control now is the switcher).
+  const open = (l: Litter) => {
+    if (isActive(l)) setActiveLitterId(l.id);
+    navigate(`/litters/${l.id}`);
+  };
+
   return (
-    <div className="p-4 sm:p-6 max-w-3xl mx-auto">
-      <PageHeader title="Litters" action={<Button icon="＋" onClick={() => navigate('/dogs?new_litter=1')}>New litter</Button>} />
+    <div className="p-4 sm:p-6 max-w-3xl mx-auto" onClick={() => setMenuId(null)}>
+      <PageHeader title="Litters" action={<Button icon={<PlusIcon size={15} />} onClick={() => navigate('/litters/new')}>New litter</Button>} />
 
       {litters.length === 0 ? (
-        <EmptyState title="No litters yet" subtitle="Start your first litter from a dam on My dogs." action={<Button onClick={() => navigate('/dogs?new_litter=1')}>＋ New litter</Button>} />
+        <EmptyState title="No litters yet" subtitle="Start your first litter from a dam on My dogs." action={<Button onClick={() => navigate('/litters/new')}>＋ New litter</Button>} />
       ) : (
         <div className="flex flex-col gap-5">
           {groups.map(
@@ -91,32 +98,53 @@ export default function Litters() {
                       const terminal = isTerminal(l);
                       const isCurrent = l.id === activeLitterId;
                       return (
-                        <Card key={l.id} className={`p-4 ${isActive(l) || terminal ? '' : 'opacity-70'}`}>
-                          <div className="flex items-start justify-between gap-2">
+                        <Card
+                          key={l.id}
+                          className={`relative p-4 hover:border-border-strong transition-colors ${isActive(l) || terminal ? '' : 'opacity-70'}`}
+                        >
+                          {/* Stretched button: whole card opens the litter, keyboard-accessible,
+                              without nesting the overflow menu inside a button. */}
+                          <button
+                            onClick={() => open(l)}
+                            aria-label={`Open ${l.name}`}
+                            className="absolute inset-0 rounded-[inherit] cursor-pointer"
+                          />
+                          <div className="relative flex items-start justify-between gap-2 pointer-events-none">
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-[15px] font-extrabold">{l.name}</span>
                                 {isCurrent && <Chip tone="accent">● Current</Chip>}
                                 <Chip tone={STATUS_TONE[l.status]}>{STATUS_LABEL[l.status]}</Chip>
                               </div>
-                              <div className="text-[11px] text-faint font-semibold mt-0.5">{dogName(l.dam_id)} × {dogName(l.sire_id)}</div>
+                              <div className="text-[11.5px] text-faint font-semibold mt-0.5">{dogName(l.dam_id)} × {dogName(l.sire_id)}</div>
                             </div>
-                            {!terminal && (
-                              <div className="flex flex-col items-end gap-1 flex-none">
-                                <Toggle checked={isActive(l)} onChange={(v) => setActive(l, v)} />
-                                <span className="text-[9.5px] font-extrabold text-faint">{isActive(l) ? 'ACTIVE' : 'INACTIVE'}</span>
-                              </div>
-                            )}
+                            {/* Overflow menu — re-enable pointer events above the stretched button */}
+                            <div className="relative flex-none pointer-events-auto">
+                              <button
+                                aria-label="Litter options"
+                                onClick={(e) => { e.stopPropagation(); setMenuId(menuId === l.id ? null : l.id); }}
+                                className="w-8 h-8 grid place-items-center rounded-full text-muted hover:bg-muted-bg cursor-pointer text-[18px] leading-none"
+                              >
+                                ⋯
+                              </button>
+                              {menuId === l.id && (
+                                <div className="absolute right-0 top-9 z-10 bg-card border border-card-border rounded-[12px] shadow-lg py-1 w-40" onClick={(e) => e.stopPropagation()}>
+                                  <button onClick={() => open(l)} className="w-full text-left px-3.5 py-2 text-[13px] font-bold hover:bg-muted-bg cursor-pointer">Open</button>
+                                  {!terminal && (
+                                    <button
+                                      onClick={() => setActive(l, !isActive(l))}
+                                      className="w-full text-left px-3.5 py-2 text-[13px] font-bold hover:bg-muted-bg cursor-pointer"
+                                    >
+                                      {isActive(l) ? 'Shelve litter' : 'Unshelve litter'}
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <div className="text-[11px] text-muted font-semibold mt-2">
+                          <div className="relative text-[11.5px] text-muted font-semibold mt-2 pointer-events-none">
                             {whelping ? `Whelping ${niceDate(whelping)}` : 'Not whelped'}{handover ? ` · handover ${niceDate(handover)}` : ''}
                             {' · '}{nPups} pup{nPups === 1 ? '' : 's'} · {nTasks} open task{nTasks === 1 ? '' : 's'}
-                          </div>
-                          <div className="flex gap-2 mt-3">
-                            {isActive(l) && !isCurrent && (
-                              <Button variant="secondary" size="sm" onClick={() => setActiveLitterId(l.id)}>Set as current</Button>
-                            )}
-                            <Button variant="ghost" size="sm" onClick={() => { if (isActive(l)) setActiveLitterId(l.id); navigate(`/litters/${l.id}`); }}>Open dates & tasks →</Button>
                           </div>
                         </Card>
                       );
