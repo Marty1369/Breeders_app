@@ -1,10 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { Avatar, CircleCheckbox, EmptyState, PageHeader, SegmentedControl } from '../components/ui';
 import { diffDays, longDate, niceDate, todayStr } from '../lib/dates';
 import { effectiveDate } from '../lib/scheduling';
+import { markTaskDone } from '../lib/actions';
 import { STAGE_ORDER, STAGE_LABEL, STAGE_SUB, STAGE_COLOR, birthFraming } from '../lib/stages';
+
+// Tasks that record a measurement (progesterone / ultrasound) open the Complete
+// sheet; every other task just toggles done (spec §4.2).
+const isLoggable = (t: Task) => /progesterone|ultrasound/i.test(t.name);
 import TaskDetailSheet from '../components/task/TaskDetailSheet';
 import CompleteTaskSheet from '../components/task/CompleteTaskSheet';
 import TaskFormSheet from '../components/task/TaskFormSheet';
@@ -39,6 +44,21 @@ export default function Timeline({ mode = 'both', embedded = false }: { mode?: '
   const [formOpen, setFormOpen] = useState(params.get('new_task') === '1');
   const [calMonth, setCalMonth] = useState(todayStr().slice(0, 7));
   const [calDay, setCalDay] = useState(todayStr());
+  const [undoTask, setUndoTask] = useState<Task | null>(null);
+
+  // Auto-dismiss the Undo snackbar.
+  useEffect(() => {
+    if (!undoTask) return;
+    const id = setTimeout(() => setUndoTask(null), 4500);
+    return () => clearTimeout(id);
+  }, [undoTask]);
+
+  const toggleCircle = (task: Task) => {
+    if (task.status === 'done') { markTaskDone(task, false); return; } // uncheck
+    if (isLoggable(task)) { setCompleteTask(task); return; }           // record a result
+    markTaskDone(task, true);                                          // instant complete
+    setUndoTask(task);
+  };
 
   const litter = litters.find((l) => l.id === activeLitterId);
   const litterTasks = useMemo(
@@ -151,7 +171,7 @@ export default function Timeline({ mode = 'both', embedded = false }: { mode?: '
                   </div>
                   <div className="flex flex-col gap-1.5">
                     {items.map((t) => (
-                      <TaskRow key={t.id} task={t} onOpen={() => setDetailTask(t)} onComplete={() => setCompleteTask(t)} />
+                      <TaskRow key={t.id} task={t} onOpen={() => setDetailTask(t)} />
                     ))}
                   </div>
                 </div>
@@ -191,10 +211,22 @@ export default function Timeline({ mode = 'both', embedded = false }: { mode?: '
         defaultDate={view === 'calendar' ? calDay : undefined}
         onClose={closeSheets}
       />
+
+      {undoTask && (
+        <div className="fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-[#191c1a] text-white rounded-full pl-4 pr-2 py-2 shadow-lg" role="status">
+          <span className="text-[13px] font-bold truncate max-w-[200px]">{undoTask.name} — done</span>
+          <button
+            onClick={() => { markTaskDone(undoTask, false); setUndoTask(null); }}
+            className="text-[13px] font-extrabold text-[#7fd4ae] px-3 py-1 rounded-full hover:bg-white/10 cursor-pointer"
+          >
+            Undo
+          </button>
+        </div>
+      )}
     </div>
   );
 
-  function TaskRow({ task, onOpen, onComplete }: { task: Task; onOpen: () => void; onComplete: () => void }) {
+  function TaskRow({ task, onOpen }: { task: Task; onOpen: () => void }) {
     const done = task.status === 'done';
     const assignees = members.filter((m) => task.assignee_ids.includes(m.user_id));
     const rel = relDate(task.start_date, today, done);
@@ -208,8 +240,8 @@ export default function Timeline({ mode = 'both', embedded = false }: { mode?: '
       >
         <CircleCheckbox
           checked={done}
-          size={28}
-          onClick={() => (done ? onOpen() : onComplete())}
+          size={30}
+          onClick={() => toggleCircle(task)}
           aria-label={done ? `Reopen ${task.name}` : `Complete ${task.name}`}
         />
         <button onClick={onOpen} className="flex-1 min-w-0 text-left cursor-pointer">

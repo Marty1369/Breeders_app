@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { useAuth } from '../state/AuthProvider';
-import { Button, Card, CircleCheckbox, EmptyState, safeColor } from '../components/ui';
+import { Avatar, Button, Card, CircleCheckbox, EmptyState, safeColor } from '../components/ui';
 import { ScaleIcon } from '../components/icons';
 import { addDays, diffDays, niceDate, parseDate, todayStr } from '../lib/dates';
 import { effectiveDate, hasWeightAlert } from '../lib/scheduling';
@@ -16,6 +16,20 @@ import type { Dog, Puppy, RuleCheck } from '../lib/types';
 // The journey ribbon (§3.2) lands in P3.
 
 const isWeighItem = (name: string) => /weigh/i.test(name);
+
+type TodayRow = {
+  key: string;
+  done: boolean;
+  name: string;
+  time: string;
+  who: { name: string; avatar_color: string } | null;
+  onToggle: () => void;
+  onOpen?: () => void;
+};
+
+// Group today's rows into Morning / Evening / Anytime slots (spec §3.1).
+const slotOf = (time: string): 'Morning' | 'Evening' | 'Anytime' =>
+  !time ? 'Anytime' : time < '12:00' ? 'Morning' : time >= '17:00' ? 'Evening' : 'Anytime';
 
 export default function Home() {
   const {
@@ -77,15 +91,44 @@ export default function Home() {
       const occ = litter ? occurrencesForDate(recurrenceRules, checkMap, d, litterDates, litter.id, today) : [];
       const dayTasks = litter ? tasks.filter((t) => t.litter_id === litter.id && t.start_date === d) : [];
       const names = [...new Set([...occ.map((o) => o.rule.name), ...dayTasks.map((t) => t.name)])];
-      return { date: d, names, count: occ.length + dayTasks.length };
+      const age = whelping && d >= whelping ? `pups will be ${Math.max(0, Math.floor(diffDays(whelping, d) / 7))} weeks old` : '';
+      return { date: d, names, count: occ.length + dayTasks.length, age };
     })
     .filter((d) => d.count > 0)
     .slice(0, 3);
+
+  // Celebration: what's first up tomorrow (spec §3.1).
+  const tomorrow = addDays(today, 1);
+  const tmrwOccs = litter ? occurrencesForDate(recurrenceRules, checkMap, tomorrow, litterDates, litter.id, today) : [];
+  const tmrwTasks = litter ? tasks.filter((t) => t.litter_id === litter.id && t.start_date === tomorrow) : [];
+  const tomorrowNext = tmrwOccs[0]?.rule.name ?? tmrwTasks[0]?.name ?? null;
 
   const activeLitters = litters.filter((l) => l.is_active && l.status !== 'closed' && l.status !== 'did_not_take');
 
   const toggleOcc = (o: Occurrence) =>
     setOccurrence(space!.id, o.rule.id, o.date, o.time, o.check?.status === 'done' ? null : 'done', user?.id);
+
+  // Unified today rows (occurrences + one-off tasks), carrying the assignee and
+  // time so the row can show a 26px avatar + time chip and be slot-grouped.
+  const todayRows: TodayRow[] = [
+    ...todayOccs.map((o) => ({
+      key: o.key,
+      done: o.check?.status === 'done',
+      name: o.rule.name,
+      time: o.time,
+      who: members.find((m) => m.user_id === o.assigneeId) ?? null,
+      onToggle: () => toggleOcc(o),
+    })),
+    ...todayTasks.map((t) => ({
+      key: t.id,
+      done: t.status === 'done',
+      name: t.name,
+      time: '',
+      who: members.find((m) => t.assignee_ids.includes(m.user_id)) ?? null,
+      onToggle: () => markTaskDone(t, t.status !== 'done'),
+      onOpen: () => navigate('/plan'),
+    })),
+  ];
 
   if (litters.length === 0) {
     const hasDogs = dogs.length > 0;
@@ -176,7 +219,7 @@ export default function Home() {
             ) : allDone ? (
               <div className="rounded-[18px] p-5 text-white" style={{ background: '#123f2d' }}>
                 <div className="text-[16px] font-extrabold">Everything's done for today 🎉</div>
-                <div className="text-[12.5px] font-semibold opacity-80 mt-1">Nice work — check back tomorrow.</div>
+                <div className="text-[12.5px] font-semibold opacity-80 mt-1">{tomorrowNext ? `Next up tomorrow: ${tomorrowNext}` : 'Nice work — check back tomorrow.'}</div>
               </div>
             ) : (() => {
               const occ = openOccs[0];
@@ -223,25 +266,20 @@ export default function Home() {
                   <div className="h-full bg-accent rounded-full" style={{ width: `${total ? (doneCount / total) * 100 : 0}%` }} />
                 </div>
                 <div className="flex flex-col">
-                  {todayOccs.map((o) => (
-                    <CheckRow
-                      key={o.key}
-                      done={o.check?.status === 'done'}
-                      name={o.rule.name}
-                      meta={o.time || 'Anytime'}
-                      onToggle={() => toggleOcc(o)}
-                    />
-                  ))}
-                  {todayTasks.map((t) => (
-                    <CheckRow
-                      key={t.id}
-                      done={t.status === 'done'}
-                      name={t.name}
-                      meta="task"
-                      onToggle={() => markTaskDone(t, t.status !== 'done')}
-                      onOpen={() => navigate('/plan')}
-                    />
-                  ))}
+                  {todayRows.length > 5 ? (
+                    (['Morning', 'Evening', 'Anytime'] as const).map((slot) => {
+                      const g = todayRows.filter((r) => slotOf(r.time) === slot);
+                      if (!g.length) return null;
+                      return (
+                        <div key={slot}>
+                          <div className="text-[12px] font-extrabold text-faint mt-2 mb-0.5">{slot}</div>
+                          {g.map(({ key, ...r }) => <CheckRow key={key} {...r} />)}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    todayRows.map(({ key, ...r }) => <CheckRow key={key} {...r} />)
+                  )}
                 </div>
               </Card>
             )}
@@ -297,7 +335,10 @@ export default function Home() {
                   {coming.map((d) => (
                     <button key={d.date} onClick={() => navigate('/plan')} className="w-full flex items-center gap-3 px-4 py-2.5 border-b border-border-soft last:border-0 text-left hover:bg-muted-bg">
                       <div className="w-[64px] flex-none text-[11.5px] font-extrabold text-[#3a413d]">{dowShort(d.date)}</div>
-                      <div className="flex-1 text-[13px] font-bold truncate">{d.names.join(' · ')}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13px] font-bold truncate">{d.names.join(' · ')}</div>
+                        {d.age && <div className="text-[11px] text-faint font-semibold truncate">{d.age}</div>}
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -310,14 +351,16 @@ export default function Home() {
   );
 }
 
-function CheckRow({ done, name, meta, onToggle, onOpen }: { done: boolean; name: string; meta: string; onToggle: () => void; onOpen?: () => void }) {
+function CheckRow({ done, name, time, who, onToggle, onOpen }: Omit<TodayRow, 'key'>) {
   return (
-    <div className="flex items-center gap-3 min-h-[52px] py-1">
-      <CircleCheckbox checked={done} size={28} onClick={(e) => { e.stopPropagation(); onToggle(); }} aria-label={done ? `Uncheck ${name}` : `Check ${name}`} />
+    <div className="flex items-center gap-3 min-h-[56px] py-1">
+      <CircleCheckbox checked={done} size={30} onClick={(e) => { e.stopPropagation(); onToggle(); }} aria-label={done ? `Uncheck ${name}` : `Check ${name}`} />
       <button className="flex-1 min-w-0 text-left cursor-pointer" onClick={onOpen}>
         <div className={`text-[15px] font-bold truncate ${done ? 'line-through text-faint' : ''}`}>{name}</div>
-        <div className="text-[12px] text-faint font-semibold">{meta}</div>
+        <div className="text-[12px] text-faint font-semibold truncate">{who ? who.name : time ? 'Scheduled' : 'One-off task'}</div>
       </button>
+      {who && <Avatar name={who.name} color={who.avatar_color} size={26} />}
+      {time && <span className="flex-none text-[10px] font-extrabold px-2 py-1 rounded-full bg-chip-bg text-muted tabular-nums">{time}</span>}
     </div>
   );
 }

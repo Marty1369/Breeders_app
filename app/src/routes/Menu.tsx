@@ -14,12 +14,12 @@ const ITEMS: { to: string; label: string; icon: ReactNode }[] = [
   { to: '/whelping', label: 'Whelping', icon: <HeartPulseIcon /> },
   { to: '/weigh-in', label: 'Weigh-ins', icon: <ScaleIcon /> },
   { to: '/health-log', label: 'Health log', icon: <CrossIcon /> },
-  { to: '/expenses', label: 'Expenses', icon: <CoinsIcon /> },
+  { to: '/expenses', label: 'Money', icon: <CoinsIcon /> },
   { to: '/buyers', label: 'Buyers', icon: <UsersIcon /> },
   { to: '/docs', label: 'Documents', icon: <FileIcon /> },
   { to: '/plan?tab=routines', label: 'Routines', icon: <RepeatIcon /> },
+  { to: '/dogs', label: 'Dogs & litters', icon: <DogIcon /> },
   { to: '/litters', label: 'Litters', icon: <PawIcon /> },
-  { to: '/dogs', label: 'My dogs', icon: <DogIcon /> },
   { to: '/team', label: 'Team & invites', icon: <UsersIcon /> },
   { to: '/notifications', label: 'Notifications', icon: <BellIcon /> },
   { to: '/settings', label: 'Settings', icon: <SettingsIcon /> },
@@ -42,17 +42,17 @@ export default function Menu() {
         <Card className="p-3.5 flex items-center gap-3 cursor-pointer mb-4">
           {me && <Avatar name={me.name} color={me.avatar_color} size={40} />}
           <div>
-            <div className="text-[13.5px] font-extrabold">{me?.name}</div>
-            <div className="text-[10.5px] text-faint font-semibold">My profile</div>
+            <div className="text-[15px] font-extrabold">{me?.name}</div>
+            <div className="text-[12px] text-faint font-semibold">My profile</div>
           </div>
         </Card>
       </Link>
 
       <button onClick={() => setSwitcherOpen(true)} className="w-full text-left cursor-pointer">
         <Card className="p-3.5 mb-4">
-          <div className="text-[10px] font-extrabold text-faint tracking-wide">You're looking at</div>
-          <div className="text-[13.5px] font-extrabold mt-0.5">{activeLitter?.name || 'None selected'}</div>
-          <div className="text-[11px] text-accent font-extrabold mt-1">Switch litter →</div>
+          <div className="text-[12px] font-extrabold text-faint">You're looking at</div>
+          <div className="text-[15px] font-extrabold mt-0.5">{activeLitter?.name || 'None selected'}</div>
+          <div className="text-[12px] text-accent font-extrabold mt-1">Switch litter →</div>
         </Card>
       </button>
 

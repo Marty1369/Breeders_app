@@ -29,8 +29,14 @@ const CAT_COLORS: Record<ExpenseCategory, string> = {
   other: '#8a938e',
 };
 
+/** In-bar share of the total in/out (green vs amber), never 0/100 when both exist. */
+function barPct(inAmt: number, outAmt: number): number {
+  const t = inAmt + outAmt;
+  return t <= 0 ? 50 : Math.round((inAmt / t) * 100);
+}
+
 export default function Expenses() {
-  const { litters, activeLitterId, expenses, payers, puppies } = useSpace();
+  const { litters, activeLitterId, expenses, payers, puppies, owners } = useSpace();
   const [params, setParams] = useSearchParams();
   const [addOpen, setAddOpen] = useState(params.get('new') === '1');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -38,8 +44,17 @@ export default function Expenses() {
   const litterExpenses = expenses.filter((e) => e.litter_id === activeLitterId);
 
   const total = litterExpenses.reduce((s, e) => s + e.amount_eur, 0);
-  const puppyCount = puppies.filter((p) => p.litter_id === activeLitterId && p.status !== 'deceased').length;
+  const litterPuppies = puppies.filter((p) => p.litter_id === activeLitterId && p.status !== 'deceased');
+  const puppyCount = litterPuppies.length;
   const perPuppy = puppyCount > 0 ? total / puppyCount : 0;
+
+  // Income = owner payments for this litter's puppies, deduped by owner (a buyer
+  // reserving two pups is counted once) — same computation as Home.
+  const litterOwnerIds = [...new Set(litterPuppies.map((p) => p.owner_id).filter((id): id is string => !!id))];
+  const received = litterOwnerIds.reduce((s, oid) => {
+    const owner = owners.find((o) => o.id === oid);
+    return s + (owner ? owner.payments.reduce((a, pay) => a + pay.amount, 0) : 0);
+  }, 0);
 
   const byCategory = useMemo(() => {
     const m = new Map<ExpenseCategory, number>();
@@ -88,21 +103,19 @@ export default function Expenses() {
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto">
       <PageHeader
-        title="Expenses"
+        title="Money"
         subtitle={litter?.name}
         action={<Button onClick={() => setAddOpen(true)}>＋ Add</Button>}
       />
 
-      <div className="grid grid-cols-2 gap-3 mb-5">
-        <Card className="p-4">
-          <div className="text-[10px] font-extrabold text-faint tracking-wide">TOTAL SPENT</div>
-          <div className="text-[22px] font-extrabold mt-1">€{total.toFixed(0)}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-[10px] font-extrabold text-faint tracking-wide">COST PER PUPPY</div>
-          <div className="text-[22px] font-extrabold mt-1">€{perPuppy.toFixed(0)}</div>
-        </Card>
-      </div>
+      <Card className="p-4 mb-5">
+        <div className="text-[18px] font-extrabold">€{Math.round(received)} in · €{Math.round(total)} out</div>
+        <div className="flex h-2.5 rounded-full overflow-hidden mt-2.5 bg-chip-bg">
+          <div style={{ width: `${barPct(received, total)}%`, background: '#17805a' }} />
+          <div style={{ width: `${100 - barPct(received, total)}%`, background: '#d9a05c' }} />
+        </div>
+        <div className="text-[12px] text-faint font-semibold mt-2.5">Cost €{perPuppy.toFixed(0)} / puppy</div>
+      </Card>
 
       {byCategory.length > 0 && (
         <Card className="p-4 mb-5">
@@ -119,7 +132,7 @@ export default function Expenses() {
                   <span className="w-2 h-2 rounded-full" style={{ background: CAT_COLORS[cat] }} />
                   {CAT_LABEL[cat]}
                 </span>
-                <span className="text-muted">€{amt.toFixed(0)}</span>
+                <span className="text-muted tabular-nums">€{amt.toFixed(0)} · {total > 0 ? Math.round((amt / total) * 100) : 0}%</span>
               </div>
             ))}
           </div>

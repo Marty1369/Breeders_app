@@ -73,7 +73,7 @@ export default function BirthLog() {
   const puppyNameFor = (e: BirthEvent) => litterPuppies.find((p) => p.id === e.puppy_id)?.name;
 
   return (
-    <div className={`min-h-full ${started ? 'bg-[#12140f] text-white' : ''}`}>
+    <div className={`min-h-full ${started ? 'bg-[#0e1511] text-white' : ''}`}>
       <div className="p-4 sm:p-6 max-w-2xl mx-auto">
         {started ? (
           <div className="mb-4">
@@ -114,10 +114,10 @@ export default function BirthLog() {
 
             {!finished && (
               <div className="flex gap-3 mb-5">
-                <Button onClick={() => add('born')} disabled={busy} className="flex-1 !min-h-14 !text-[15px]">
+                <Button onClick={() => add('born')} disabled={busy} className="flex-1 !min-h-16 !text-[15px]">
                   ＋ Puppy born
                 </Button>
-                <Button variant="danger" onClick={() => add('stillborn')} disabled={busy} className="flex-1 !min-h-14 !text-[15px]">
+                <Button variant="danger" onClick={() => add('stillborn')} disabled={busy} className="flex-1 !min-h-16 !text-[15px]">
                   Stillborn
                 </Button>
               </div>

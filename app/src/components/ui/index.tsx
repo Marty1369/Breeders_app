@@ -324,7 +324,7 @@ export function SegmentedControl<T extends string>({
           key={o.value}
           onClick={() => onChange(o.value)}
           className={`flex-1 text-center py-2 px-1 rounded-[9px] text-[12px] font-extrabold cursor-pointer transition-colors ${
-            value === o.value ? 'bg-white text-ink shadow-sm' : 'text-muted'
+            value === o.value ? 'bg-[#191c1a] text-white shadow-sm' : 'text-muted'
           }`}
         >
           {o.label}

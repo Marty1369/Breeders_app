@@ -54,13 +54,20 @@ const DAY_STATE_STYLE: Record<DayState, string> = {
 };
 
 function scheduleSummary(rule: RecurrenceRule): string {
+  const times = rule.times;
+  // Plain-words daily wording (spec §4.4): "Twice daily · 08:00 & 18:00".
+  if (rule.freq === 'daily' && rule.interval === 1) {
+    if (times.length === 1) return `Once daily · ${times[0]}`;
+    if (times.length === 2) return `Twice daily · ${times.join(' & ')}`;
+    return `${times.length}× daily · ${times.join(' & ')}`;
+  }
   const freq =
     rule.freq === 'daily'
-      ? rule.interval === 1 ? 'Daily' : `Every ${rule.interval} days`
+      ? `Every ${rule.interval} days`
       : rule.freq === 'weekly'
         ? rule.interval === 1 ? 'Weekly' : `Every ${rule.interval} weeks`
         : `Every ${rule.interval} days`;
-  return `${freq} · ${rule.times.join(', ')}`;
+  return `${freq} · ${times.join(', ')}`;
 }
 
 export default function Ongoing({ embedded = false }: { embedded?: boolean }) {
@@ -181,21 +188,32 @@ export default function Ongoing({ embedded = false }: { embedded?: boolean }) {
                     const end = ruleEndDate(rule, litterDates);
                     const assignees = members.filter((m) => rule.assignee_ids.includes(m.user_id));
                     const { days, pct } = ruleHistory(rule, checkMap, today, litterDates);
+                    // Round-robin rotation, in the rule's own assignee order (spec §4.4).
+                    const rotation =
+                      rule.assignee_ids.length > 1
+                        ? rule.assignee_ids
+                            .map((id) => memberName(id)?.name)
+                            .filter((n): n is string => !!n)
+                            .join(' → ')
+                        : null;
                     return (
                       <Card key={rule.id} className={`p-3.5 ${rule.paused ? 'opacity-60' : ''}`}>
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="text-[13.5px] font-extrabold">{rule.name}</span>
+                              <span className="text-[15px] font-extrabold">{rule.name}</span>
                               {rule.paused && <Chip>Paused</Chip>}
                             </div>
-                            <div className="text-[11px] text-muted font-semibold mt-0.5">{scheduleSummary(rule)}</div>
-                            <div className="text-[10.5px] text-faint font-semibold mt-0.5">
+                            <div className="text-[12px] text-muted font-semibold mt-0.5">{scheduleSummary(rule)}</div>
+                            {rotation && (
+                              <div className="text-[11.5px] text-faint font-semibold mt-0.5">takes turns: {rotation}</div>
+                            )}
+                            <div className="text-[11.5px] text-faint font-semibold mt-0.5">
                               From {niceDate(rule.start_date)}{end ? ` until ${niceDate(end)}` : ' · no end'}
                             </div>
                           </div>
                           <div className="flex items-center gap-2 flex-none">
-                            {pct != null && <span className="text-[11px] font-extrabold text-accent tabular-nums">{pct}%</span>}
+                            {pct != null && <span className="text-[12px] font-extrabold text-accent tabular-nums">{pct}% kept up</span>}
                             <div className="flex -space-x-1.5">
                               {assignees.slice(0, 3).map((m) => (
                                 <Avatar key={m.user_id} name={m.name} color={m.avatar_color} size={22} />
@@ -208,9 +226,9 @@ export default function Ongoing({ embedded = false }: { embedded?: boolean }) {
                         {days.some((d) => d.state !== 'future' && d.state !== 'none') ? (
                           <div className="flex items-center gap-[3px] mt-2.5" title="Last 14 days">
                             {days.map((d, i) => (
-                              <span key={i} className={`w-[13px] h-[13px] rounded-[3px] ${DAY_STATE_STYLE[d.state]}`} title={`${niceDate(d.date)}: ${d.state}`} />
+                              <span key={i} className={`w-4 h-4 rounded-[3px] ${DAY_STATE_STYLE[d.state]}`} title={`${niceDate(d.date)}: ${d.state}`} />
                             ))}
-                            <span className="ml-1.5 text-[9px] font-bold text-faint">14d</span>
+                            <span className="ml-2 text-[11px] font-bold text-faint">last 14 days</span>
                           </div>
                         ) : (
                           <div className="text-[10.5px] font-semibold text-faint mt-2">Starts {niceDate(rule.start_date)}</div>

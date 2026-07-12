@@ -17,6 +17,7 @@ import TaskFormSheet from '../components/task/TaskFormSheet';
 import Home from './Home';
 import Plan from './Plan';
 import Litters from './Litters';
+import NewLitterWizard from '../components/NewLitterWizard';
 import { AllDocuments, AllBuyers, AllExpenses } from './Aggregates';
 import Dogs from './Dogs';
 import LitterInfo from './LitterInfo';
@@ -191,7 +192,8 @@ export default function AppShell() {
               <Route path="/gantt" element={<Navigate to="/plan?tab=gantt" replace />} />
               <Route path="/ongoing" element={<Navigate to="/plan?tab=routines" replace />} />
               <Route path="/menu" element={<Navigate to="/kennel" replace />} />
-              <Route path="/litters/new" element={<Navigate to="/dogs?new_litter=1" replace />} />
+              {/* The new-litter wizard lives here now (spec §7), not on /dogs. */}
+              <Route path="/litters/new" element={<NewLitterRoute />} />
               {/* Cross-litter */}
               <Route path="/litters" element={<Litters />} />
               <Route path="/all-documents" element={<AllDocuments />} />
@@ -253,6 +255,7 @@ export default function AppShell() {
                 { label: 'Task', run: () => setNewTaskOpen(true) },
                 { label: 'Weigh-in', run: () => navigate('/weigh-in') },
                 { label: 'Expense', run: () => navigate('/expenses') },
+                { label: 'Note', run: () => setNewTaskOpen(true) },
               ].map((o) => (
                 <button
                   key={o.label}
@@ -283,6 +286,18 @@ function isMobileTabActive(to: string, path: string): boolean {
 
 function dogName(dogs: Dog[], id: string | null): string {
   return dogs.find((d) => d.id === id)?.name ?? '—';
+}
+
+// The new-litter wizard as a route (spec §7): the Litters list sits behind the
+// sheet for context; closing returns to the list.
+function NewLitterRoute() {
+  const navigate = useNavigate();
+  return (
+    <>
+      <Litters />
+      <NewLitterWizard open onClose={() => navigate('/litters')} />
+    </>
+  );
 }
 
 function Logo({ size }: { size: number }) {
