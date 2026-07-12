@@ -1,13 +1,14 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { useAuth } from '../state/AuthProvider';
+import { supabase } from '../lib/supabase';
 import { Avatar, Button, Card, CircleCheckbox, EmptyState, safeColor } from '../components/ui';
 import { ScaleIcon } from '../components/icons';
 import { addDays, diffDays, niceDate, parseDate, todayStr } from '../lib/dates';
-import { effectiveDate, hasWeightAlert } from '../lib/scheduling';
+import { effectiveDate, hasWeightAlert, recomputeLitterDates, setActualDate, tasksFromTemplates } from '../lib/scheduling';
 import { litterProgress } from '../lib/stages';
-import { checkKey, occurrencesForDate, type Occurrence } from '../lib/recurrence';
+import { checkKey, occurrencesForDate, defaultRulesForLitter, type Occurrence } from '../lib/recurrence';
 import { markTaskDone, setOccurrence } from '../lib/actions';
 import JourneyRibbon, { type Stop } from '../components/JourneyRibbon';
 import type { Dog, Puppy, RuleCheck } from '../lib/types';
@@ -34,8 +35,9 @@ const slotOf = (time: string): 'Morning' | 'Evening' | 'Anytime' =>
 export default function Home() {
   const {
     space, me, members, litters, tasks, puppies, dogs, owners, expenses, recurrenceRules, ruleChecks,
-    activeLitterId, setActiveLitterId,
+    taskTemplates, activeLitterId, setActiveLitterId,
   } = useSpace();
+  const [seeding, setSeeding] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
   const today = todayStr();
@@ -108,6 +110,56 @@ export default function Home() {
   const toggleOcc = (o: Occurrence) =>
     setOccurrence(space!.id, o.rule.id, o.date, o.time, o.check?.status === 'done' ? null : 'done', user?.id);
 
+  // "Explore with a sample litter" (spec §7): a client-side demo — a dam, a
+  // born-3-weeks-ago litter with the full task plan + care rules, and 6 pups.
+  // Flagged with code '__sample__' so it can be one-tap deleted. No migration.
+  const seedSample = async () => {
+    if (!space || seeding) return;
+    setSeeding(true);
+    try {
+      const { data: dam } = await supabase
+        .from('dogs')
+        .insert({ space_id: space.id, name: 'Skye', sex: 'female', breed: 'Australian Shepherd' })
+        .select('id')
+        .single();
+      const whelp = addDays(todayStr(), -21);
+      const dates = recomputeLitterDates(setActualDate({ heat: { predicted: null, actual: addDays(whelp, -60) } }, 'whelping', whelp));
+      const { data: litter } = await supabase
+        .from('litters')
+        .insert({ space_id: space.id, name: 'Sample litter', code: '__sample__', letter: 'S', dam_id: dam?.id ?? null, status: 'born', dates })
+        .select('*')
+        .single();
+      if (!litter) return;
+      const collars = ['#b93a2e', '#b97324', '#17805a', '#4a6fa5', '#7c5f8f', '#3a3f3b'];
+      const nm = ['Sample A', 'Sample B', 'Sample C', 'Sample D', 'Sample E', 'Sample F'];
+      const yest = addDays(todayStr(), -1);
+      await supabase.from('puppies').insert(
+        nm.map((n, i) => ({
+          space_id: space.id, litter_id: litter.id, name: n,
+          sex: i % 2 ? 'male' : 'female', color: 'blue merle', collar_color: collars[i],
+          birth_weight: 300, weigh_log: { [yest]: { am: 1180 + i * 45 } }, status: i < 2 ? 'available' : 'reserved',
+        })),
+      );
+      const taskRows = tasksFromTemplates(taskTemplates, { id: litter.id, space_id: space.id }, dates);
+      if (taskRows.length) await supabase.from('tasks').insert(taskRows);
+      const ruleRows = defaultRulesForLitter({ id: litter.id, space_id: space.id }, dates);
+      if (ruleRows.length) await supabase.from('recurrence_rules').insert(ruleRows);
+      setActiveLitterId(litter.id);
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  const deleteSample = async () => {
+    if (!litter || litter.code !== '__sample__' || seeding) return;
+    setSeeding(true);
+    const damId = litter.dam_id;
+    await supabase.from('litters').delete().eq('id', litter.id); // cascades pups/tasks/rules
+    if (damId) await supabase.from('dogs').delete().eq('id', damId);
+    setActiveLitterId(null);
+    setSeeding(false);
+  };
+
   // Unified today rows (occurrences + one-off tasks), carrying the assignee and
   // time so the row can show a 26px avatar + time chip and be slot-grouped.
   const todayRows: TodayRow[] = [
@@ -160,6 +212,16 @@ export default function Home() {
             You can invite teammates any time from Kennel → Team.
           </div>
         )}
+
+        {/* §7: kick the tyres without committing real data. */}
+        <button
+          onClick={seedSample}
+          disabled={seeding}
+          className="w-full mt-5 rounded-[14px] border border-dashed border-accent/40 bg-accent-soft/40 px-4 py-3 text-left cursor-pointer disabled:opacity-60"
+        >
+          <div className="text-[13.5px] font-extrabold text-accent">{seeding ? 'Setting up…' : 'Explore with a sample litter →'}</div>
+          <div className="text-[12px] text-muted font-semibold mt-0.5">6 pretend puppies, deletable anytime.</div>
+        </button>
       </div>
     );
   }
@@ -167,9 +229,20 @@ export default function Home() {
   return (
     <div className="max-w-3xl mx-auto pb-24">
       <h1 className="sr-only">Home — today's plan for {litter ? litter.name : space?.kennel_name || 'your kennel'}</h1>
+      {litter?.code === '__sample__' && (
+        <div className="bg-[#f7ecdc] px-4 sm:px-6 py-2 flex items-center gap-2 text-[12.5px] font-semibold text-[#7a4e12]">
+          <span className="flex-1">This is a sample litter — explore freely.</span>
+          <button onClick={deleteSample} disabled={seeding} className="font-extrabold underline cursor-pointer disabled:opacity-60">
+            {seeding ? 'Deleting…' : 'Delete sample'}
+          </button>
+        </div>
+      )}
       {/* Dark header */}
       <div className="text-white px-4 sm:px-6 pt-5 pb-8" style={{ background: '#123f2d' }}>
-        <div className="text-[11px] font-extrabold tracking-wide opacity-75">{greeting}{me ? `, ${me.name.split(' ')[0]}` : ''}</div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="text-[11px] font-extrabold tracking-wide opacity-75">{greeting}{me ? `, ${me.name.split(' ')[0]}` : ''}</div>
+          <button onClick={() => navigate('/litters/new')} className="hidden lg:inline-flex items-center flex-none px-3 py-1.5 rounded-full text-[12px] font-extrabold bg-white/15 hover:bg-white/25 text-white cursor-pointer">＋ New litter</button>
+        </div>
         {litter ? (
           <>
             <div className="text-[12.5px] font-bold opacity-80 mt-1">
@@ -204,12 +277,13 @@ export default function Home() {
         )}
       </div>
 
-      {/* Light sheet */}
-      <div className="bg-app-bg rounded-t-[24px] -mt-5 relative px-4 sm:px-6 pt-5 flex flex-col gap-4">
+      {/* Light sheet — single column on phones, 1.35fr/1fr grid on desktop (§3.3) */}
+      <div className="bg-app-bg rounded-t-[24px] -mt-5 relative px-4 sm:px-6 pt-5 flex flex-col gap-4 lg:grid lg:grid-cols-[1.35fr_1fr] lg:gap-5 lg:items-start">
         {!litter ? (
           <EmptyState title="Pick a litter" subtitle="Choose a litter from the switcher to see today's plan." />
         ) : (
           <>
+            <div className="flex flex-col gap-4 min-w-0">
             {/* UP NEXT */}
             {total === 0 ? (
               <Card className="p-5 text-center">
@@ -283,7 +357,9 @@ export default function Home() {
                 </div>
               </Card>
             )}
+            </div>
 
+            <div className="flex flex-col gap-4 min-w-0">
             {/* Weight alert */}
             {alertPuppy && (
               <button onClick={() => navigate('/weigh-in')} className="rounded-[16px] p-4 text-left cursor-pointer" style={{ background: '#fbeee0' }}>
@@ -344,6 +420,7 @@ export default function Home() {
                 </div>
               </div>
             )}
+            </div>
           </>
         )}
       </div>
