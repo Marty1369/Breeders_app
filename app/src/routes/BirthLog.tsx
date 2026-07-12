@@ -2,12 +2,21 @@ import { useEffect, useState } from 'react';
 import { useSpace } from '../state/SpaceProvider';
 import { useAuth } from '../state/AuthProvider';
 import { Button, Card, Chip, EmptyState, PageHeader, Select, Sheet, TextField } from '../components/ui';
-import { longDate } from '../lib/dates';
+import { longDate, todayStr } from '../lib/dates';
+import { cascadePreview, recomputeLitterDates, setActualDate } from '../lib/scheduling';
 import { startWhelping, logBirth, saveBirthDetails, finishWhelping } from '../lib/actions';
 import type { BirthEvent } from '../lib/types';
 
 function clockOf(iso: string | null): string {
   return iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+}
+
+function elapsedSince(iso: string | null): string {
+  if (!iso) return '';
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h > 0 ? `${h} h ${m} min in` : `${m} min in`;
 }
 
 export default function BirthLog() {
@@ -16,6 +25,7 @@ export default function BirthLog() {
   const litter = litters.find((l) => l.id === activeLitterId);
   const [busy, setBusy] = useState(false);
   const [editEvent, setEditEvent] = useState<BirthEvent | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   if (!litter) {
     return (
@@ -36,6 +46,13 @@ export default function BirthLog() {
   const retained = deliveries - placentas;
   const started = !!session?.started_at;
   const finished = !!session?.ended_at;
+
+  // Finish preview (spec §6): the birth date to be set (earliest delivery) and
+  // how many rearing tasks will shift when it cascades.
+  const earliestDelivery = events.map((e) => e.born_at).filter((x): x is string => !!x).sort()[0] ?? null;
+  const previewBirthDate = earliestDelivery ? earliestDelivery.slice(0, 10) : todayStr();
+  const previewNewDates = recomputeLitterDates(setActualDate(litter.dates, 'whelping', previewBirthDate));
+  const previewShift = cascadePreview(tasks.filter((t) => t.litter_id === litter.id), litter.dates, previewNewDates).length;
 
   const begin = async () => {
     setBusy(true);
@@ -58,21 +75,35 @@ export default function BirthLog() {
   return (
     <div className={`min-h-full ${started ? 'bg-[#12140f] text-white' : ''}`}>
       <div className="p-4 sm:p-6 max-w-2xl mx-auto">
-        <PageHeader title="Whelping birth log" subtitle={litter.name} />
+        {started ? (
+          <div className="mb-4">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#7fd4ae] animate-pulse flex-none" />
+              <div className="text-[22px] font-extrabold">Whelping night</div>
+            </div>
+            <div className="text-[12.5px] text-white/60 font-semibold mt-0.5">
+              {litter.name} · started {clockOf(session?.started_at ?? null)}
+              {!finished && session?.started_at ? ` · ${elapsedSince(session.started_at)}` : ''}
+            </div>
+          </div>
+        ) : (
+          <PageHeader title="Whelping night" subtitle={litter.name} />
+        )}
 
         {!started ? (
           <Card className="p-5 text-center">
             <div className="text-[13px] font-bold text-muted mb-3">
-              Opening the birth log notifies your team that whelping has started.
+              Opening the birth log lets your team know whelping has started. You can add details later —
+              just tap “Puppy born” each time one arrives.
             </div>
             <Button onClick={begin} disabled={busy}>Start whelping</Button>
           </Card>
         ) : (
           <>
-            <div className="flex gap-3 mb-3">
-              <Stat n={born.length} label="BORN" />
-              <Stat n={stillborn.length} label="STILLBORN" />
-              <Stat n={retained} label="PLACENTAS TO PASS" tone={retained > 0 ? 'warn' : 'ok'} />
+            <div className="rounded-[14px] px-4 py-3 mb-3 bg-white/10">
+              <div className="text-[17px] font-extrabold">
+                {born.length} born{stillborn.length > 0 ? ` · ${stillborn.length} stillborn` : ''}
+              </div>
             </div>
 
             {retained > 0 && (
@@ -104,28 +135,35 @@ export default function BirthLog() {
                 .map((e) => {
                   const name = puppyNameFor(e);
                   const summary = [
-                    e.sex,
+                    e.sex === 'female' ? '♀' : e.sex === 'male' ? '♂' : null,
                     e.weight_g ? `${e.weight_g} g` : null,
-                    e.collar_color,
+                    e.collar_color ? `${e.collar_color} collar` : null,
+                    e.calcium_given ? 'calcium ✓' : null,
                   ].filter(Boolean).join(' · ');
+                  const passed = e.placenta_passed === true;
                   return (
                     <button
                       key={e.id}
                       onClick={() => setEditEvent(e)}
-                      className="flex items-center justify-between gap-3 bg-white/5 hover:bg-white/10 rounded-[10px] px-3 py-2.5 text-left cursor-pointer"
+                      className="flex items-center gap-3 bg-white/5 hover:bg-white/10 rounded-[12px] px-3 py-2.5 text-left cursor-pointer"
                     >
-                      <div className="min-w-0">
-                        <div className="text-[12.5px] font-bold truncate">
-                          {e.type === 'stillborn' ? `Stillborn #${e.seq}` : name || `Puppy #${e.seq}`}
+                      <div
+                        className="w-9 h-9 flex-none rounded-full grid place-items-center text-[12px] font-extrabold text-white"
+                        style={{ boxShadow: `inset 0 0 0 3px ${e.collar_color || 'rgba(255,255,255,0.3)'}` }}
+                      >
+                        {e.seq}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[13px] font-bold truncate">
+                          {e.type === 'stillborn' ? `Stillborn #${e.seq}` : name || `Puppy #${e.seq}`} · {clockOf(e.born_at)}
                         </div>
-                        {summary && <div className="text-[10.5px] text-white/55 font-semibold truncate">{summary}</div>}
+                        {summary && <div className="text-[11px] text-white/55 font-semibold truncate">{summary}</div>}
                       </div>
-                      <div className="flex items-center gap-2 flex-none">
-                        {e.calcium_given && <span title="Calcium given" className="text-[11px]">Ca</span>}
-                        {e.placenta_passed && <span title="Placenta passed" className="text-[11px]">✓P</span>}
-                        <span className="text-[11px] text-white/50 font-semibold">{clockOf(e.born_at)}</span>
-                        <span className="text-white/40 text-[13px]">›</span>
-                      </div>
+                      <span
+                        className={`flex-none text-[10.5px] font-extrabold px-2 py-1 rounded-full ${passed ? 'bg-[#1e3a2a] text-[#7fd4ae]' : 'text-[#f2c879] border border-dashed border-[#f2c879]'}`}
+                      >
+                        {passed ? 'placenta ✓' : 'placenta?'}
+                      </span>
                     </button>
                   );
                 })}
@@ -140,11 +178,11 @@ export default function BirthLog() {
               </div>
             ) : (
               <>
-                <Button onClick={finish} disabled={busy} variant="secondary" className="w-full !border-white !text-white">
+                <Button onClick={() => setConfirmOpen(true)} disabled={busy || events.length === 0} variant="secondary" className="w-full !border-white !text-white">
                   Finish — set birth date &amp; unlock rearing tasks
                 </Button>
                 <div className="text-[10.5px] text-white/40 font-semibold text-center mt-2">
-                  Sets the litter's actual birth date from the first live birth.
+                  Sets birth date to tonight and re-plans the rearing tasks — you'll see a preview before anything changes.
                 </div>
               </>
             )}
@@ -159,16 +197,33 @@ export default function BirthLog() {
       </div>
 
       <BirthDetailSheet event={editEvent} puppyName={editEvent ? puppyNameFor(editEvent) : undefined} onClose={() => setEditEvent(null)} />
-    </div>
-  );
-}
 
-function Stat({ n, label, tone }: { n: number; label: string; tone?: 'ok' | 'warn' }) {
-  const color = tone === 'warn' ? 'text-[#f2c879]' : 'text-white';
-  return (
-    <div className="flex-1 bg-white/10 rounded-[14px] p-3 text-center">
-      <div className={`text-[22px] font-extrabold ${color}`}>{n}</div>
-      <div className="text-[10px] font-extrabold text-white/60 tracking-wide">{label}</div>
+      <Sheet
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Finish whelping?"
+        subtitle={litter.name}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+            <Button onClick={async () => { setConfirmOpen(false); await finish(); }} disabled={busy}>
+              {busy ? 'Finishing…' : 'Confirm'}
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3 text-ink">
+          <div className="text-[13px] font-semibold">
+            Birth date will be set to <span className="font-extrabold">{longDate(previewBirthDate)}</span> (the earliest delivery).
+          </div>
+          <div className="bg-app-bg border border-border-soft rounded-[10px] px-3 py-2.5 text-[12.5px] font-semibold">
+            {previewShift > 0
+              ? <><span className="font-extrabold">{previewShift}</span> rearing task{previewShift === 1 ? '' : 's'} will shift to line up with the real birth date.</>
+              : 'No rearing tasks need to move.'}
+          </div>
+          <div className="text-[11.5px] text-faint font-semibold">Recurring care reminders re-anchor to the birth date too.</div>
+        </div>
+      </Sheet>
     </div>
   );
 }

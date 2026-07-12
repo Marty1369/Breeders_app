@@ -35,6 +35,7 @@ export default function DogFormSheet({
   const isEdit = dog !== null;
   const [form, setForm] = useState(BLANK_DOG_FORM);
   const [busy, setBusy] = useState(false);
+  const [showMore, setShowMore] = useState(false);
 
   // Hydrate the form from the dog in edit mode; reset to blank (with the default
   // sex) in add mode.
@@ -121,6 +122,7 @@ export default function DogFormSheet({
       }
     >
       <div className="flex flex-col gap-3">
+        {/* Basics — enough to save (spec §7 progressive disclosure). */}
         <TextField label="Name" value={form.name} onChange={(e) => set('name', e.target.value)} autoFocus />
         <div className="grid grid-cols-2 gap-3">
           <Select label="Sex" value={form.sex} onChange={(e) => set('sex', e.target.value as 'female' | 'male')}>
@@ -129,39 +131,7 @@ export default function DogFormSheet({
           </Select>
           <TextField label="Breed" value={form.breed} onChange={(e) => set('breed', e.target.value)} />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <TextField label="Date of birth" type="date" value={form.dob} onChange={(e) => set('dob', e.target.value)} />
-          <TextField label="Color" value={form.color} onChange={(e) => set('color', e.target.value)} />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <TextField label="Registry" value={form.registry} onChange={(e) => set('registry', e.target.value)} placeholder="LŠVK / LOF / CMKU" />
-          <TextField label="Registration no." value={form.regNo} onChange={(e) => set('regNo', e.target.value)} />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <TextField label="Chip no." value={form.chipNo} onChange={(e) => set('chipNo', e.target.value)} />
-          <TextField label="Tail" value={form.tail} onChange={(e) => set('tail', e.target.value)} placeholder="NBT / long / docked" />
-        </div>
-
-        <div className="text-[10px] font-extrabold tracking-wider text-faint mt-1">HEALTH & CONFORMATION</div>
-        <div className="grid grid-cols-2 gap-3">
-          <TextField label="Hips" value={form.hips} onChange={(e) => set('hips', e.target.value)} placeholder="A" />
-          <TextField label="Elbows" value={form.elbows} onChange={(e) => set('elbows', e.target.value)} placeholder="0" />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <TextField label="Eyes" value={form.eyes} onChange={(e) => set('eyes', e.target.value)} placeholder="clear" />
-          <TextField label="Eye exam date" type="date" value={form.eyesExamDate} onChange={(e) => set('eyesExamDate', e.target.value)} />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <TextField label="Dentition" value={form.dentition} onChange={(e) => set('dentition', e.target.value)} placeholder="full / 42" />
-          <TextField label="Bite" value={form.bite} onChange={(e) => set('bite', e.target.value)} placeholder="scissor" />
-        </div>
-        <TextField label="Genetic tests" value={form.geneticsNotes} onChange={(e) => set('geneticsNotes', e.target.value)} placeholder="MDR1 & DM (carrier), HSF4, CEA, PRA - clear" />
-
-        <div className="text-[10px] font-extrabold tracking-wider text-faint mt-1">TITLES & RESULTS</div>
-        <TextField label="Titles" value={form.titles} onChange={(e) => set('titles', e.target.value)} placeholder="LT JCH, LV JCH, BALTIC JCH" />
-        <TextField label="Show results" value={form.showResults} onChange={(e) => set('showResults', e.target.value)} placeholder="3xCAC, 2xN" />
-        <TextField label="Working tests" value={form.workingTests} onChange={(e) => set('workingTests', e.target.value)} placeholder="NHAT test" />
-        <TextField label="Faults / notes" value={form.faults} onChange={(e) => set('faults', e.target.value)} />
+        <TextField label="Date of birth" type="date" value={form.dob} onChange={(e) => set('dob', e.target.value)} />
 
         <label className="flex items-center gap-2 mt-1 cursor-pointer">
           <input type="checkbox" checked={form.isExternal} onChange={(e) => set('isExternal', e.target.checked)} className="w-[18px] h-[18px] accent-[#17805a]" />
@@ -174,6 +144,51 @@ export default function DogFormSheet({
               <TextField label="Owner phone" value={form.extPhone} onChange={(e) => set('extPhone', e.target.value)} />
               <TextField label="City" value={form.extCity} onChange={(e) => set('extCity', e.target.value)} />
             </div>
+          </div>
+        )}
+
+        {/* Everything else is optional — tucked away by default. */}
+        <button
+          type="button"
+          onClick={() => setShowMore((v) => !v)}
+          className="flex items-center justify-between mt-1 text-[13px] font-extrabold text-accent cursor-pointer"
+        >
+          <span>Pedigree & health details</span>
+          <span>{showMore ? '−' : '+'}</span>
+        </button>
+
+        {showMore && (
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <TextField label="Color" value={form.color} onChange={(e) => set('color', e.target.value)} />
+              <TextField label="Registry" value={form.registry} onChange={(e) => set('registry', e.target.value)} placeholder="LŠVK / LOF / CMKU" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <TextField label="Registration no." value={form.regNo} onChange={(e) => set('regNo', e.target.value)} />
+              <TextField label="Chip no." value={form.chipNo} onChange={(e) => set('chipNo', e.target.value)} />
+            </div>
+            <TextField label="Tail" value={form.tail} onChange={(e) => set('tail', e.target.value)} placeholder="NBT / long / docked" />
+
+            <div className="text-[10px] font-extrabold tracking-wider text-faint mt-1">HEALTH & CONFORMATION</div>
+            <div className="grid grid-cols-2 gap-3">
+              <TextField label="Hips" value={form.hips} onChange={(e) => set('hips', e.target.value)} placeholder="A" />
+              <TextField label="Elbows" value={form.elbows} onChange={(e) => set('elbows', e.target.value)} placeholder="0" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <TextField label="Eyes" value={form.eyes} onChange={(e) => set('eyes', e.target.value)} placeholder="clear" />
+              <TextField label="Eye exam date" type="date" value={form.eyesExamDate} onChange={(e) => set('eyesExamDate', e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <TextField label="Dentition" value={form.dentition} onChange={(e) => set('dentition', e.target.value)} placeholder="full / 42" />
+              <TextField label="Bite" value={form.bite} onChange={(e) => set('bite', e.target.value)} placeholder="scissor" />
+            </div>
+            <TextField label="Genetic tests" value={form.geneticsNotes} onChange={(e) => set('geneticsNotes', e.target.value)} placeholder="MDR1 & DM (carrier), HSF4, CEA, PRA - clear" />
+
+            <div className="text-[10px] font-extrabold tracking-wider text-faint mt-1">TITLES & RESULTS</div>
+            <TextField label="Titles" value={form.titles} onChange={(e) => set('titles', e.target.value)} placeholder="LT JCH, LV JCH, BALTIC JCH" />
+            <TextField label="Show results" value={form.showResults} onChange={(e) => set('showResults', e.target.value)} placeholder="3xCAC, 2xN" />
+            <TextField label="Working tests" value={form.workingTests} onChange={(e) => set('workingTests', e.target.value)} placeholder="NHAT test" />
+            <TextField label="Faults / notes" value={form.faults} onChange={(e) => set('faults', e.target.value)} />
           </div>
         )}
 

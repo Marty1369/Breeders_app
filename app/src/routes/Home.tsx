@@ -8,6 +8,7 @@ import { effectiveDate, hasWeightAlert } from '../lib/scheduling';
 import { litterProgress } from '../lib/stages';
 import { checkKey, occurrencesForDate, type Occurrence } from '../lib/recurrence';
 import { markTaskDone, setOccurrence } from '../lib/actions';
+import JourneyRibbon, { type Stop } from '../components/JourneyRibbon';
 import type { Dog, Puppy, RuleCheck } from '../lib/types';
 
 // Home = the one daily surface (spec §3): merges the old Today + Dashboard.
@@ -17,7 +18,7 @@ const isWeighItem = (name: string) => /weigh/i.test(name);
 
 export default function Home() {
   const {
-    space, me, litters, tasks, puppies, dogs, owners, expenses, recurrenceRules, ruleChecks,
+    space, me, members, litters, tasks, puppies, dogs, owners, expenses, recurrenceRules, ruleChecks,
     activeLitterId, setActiveLitterId,
   } = useSpace();
   const { user } = useAuth();
@@ -57,8 +58,10 @@ export default function Home() {
   const dogName = (id: string | null) => dogs.find((d: Dog) => d.id === id)?.name ?? '—';
 
   const spent = expenses.filter((e) => e.litter_id === litter?.id).reduce((s, e) => s + e.amount_eur, 0);
-  const received = litterPuppies.reduce((s, p) => {
-    const owner = owners.find((o) => o.id === p.owner_id);
+  // Dedupe owners: one buyer reserving two pups must not have their payments counted twice.
+  const litterOwnerIds = [...new Set(litterPuppies.map((p) => p.owner_id).filter((id): id is string => !!id))];
+  const received = litterOwnerIds.reduce((s, oid) => {
+    const owner = owners.find((o) => o.id === oid);
     return s + (owner ? owner.payments.reduce((a, pay) => a + pay.amount, 0) : 0);
   }, 0);
 
@@ -84,15 +87,35 @@ export default function Home() {
     setOccurrence(space!.id, o.rule.id, o.date, o.time, o.check?.status === 'done' ? null : 'done', user?.id);
 
   if (litters.length === 0) {
+    const hasDogs = dogs.length > 0;
+    const hasTeam = members.length > 1;
+    const setupStops: Stop[] = [
+      { label: 'Your dogs', state: hasDogs ? 'done' : 'current' },
+      { label: 'Your team', state: hasTeam ? 'done' : hasDogs ? 'current' : 'future' },
+      { label: 'First litter', state: 'future' },
+    ];
     return (
       <div className="p-4 sm:p-6 max-w-lg mx-auto">
         <div className="text-[22px] font-extrabold">{greeting}{me ? `, ${me.name.split(' ')[0]}` : ''}</div>
         <div className="text-[12.5px] text-faint font-semibold mt-0.5 mb-5">{space?.kennel_name || space?.name}</div>
-        <EmptyState
-          title="Let's set up your kennel"
-          subtitle="Add your first dog, then start a litter from her — we'll plan all the tasks and dates automatically."
-          action={<Button onClick={() => navigate('/dogs')}>Add your first dog</Button>}
-        />
+        <div className="mb-5"><JourneyRibbon stops={setupStops} variant="light" /></div>
+        <Card className="p-4">
+          <div className="text-[11px] font-extrabold tracking-wide text-faint mb-2">UP NEXT</div>
+          <div className="text-[16px] font-extrabold">{hasDogs ? 'Start your first litter' : 'Add your first dog'}</div>
+          <div className="text-[12.5px] text-faint font-semibold mt-0.5">
+            {hasDogs
+              ? "Pick the mum and her heat date — we'll plan every task and date automatically."
+              : 'Just name & sex — 30 seconds. Then start a litter from her.'}
+          </div>
+          <Button onClick={() => navigate(hasDogs ? '/litters/new' : '/dogs')} className="w-full mt-3">
+            {hasDogs ? 'New litter' : 'Add'}
+          </Button>
+        </Card>
+        {!hasTeam && (
+          <div className="text-[12px] text-faint font-semibold mt-3 text-center">
+            You can invite teammates any time from Kennel → Team.
+          </div>
+        )}
       </div>
     );
   }
@@ -108,7 +131,8 @@ export default function Home() {
               {litter.name} · {dogName(litter.dam_id)} × {dogName(litter.sire_id)}
             </div>
             <div className="text-[22px] font-extrabold mt-0.5 leading-tight">{progress?.headline}</div>
-            {progress?.detail && <div className="text-[13px] font-semibold opacity-85 mt-0.5">{progress.detail}</div>}
+            <div className="mt-4 mb-1"><JourneyRibbon litter={litter} variant="dark" /></div>
+            {progress?.detail && <div className="text-[13px] font-semibold opacity-85 mt-1">{progress.detail}</div>}
             <div className="flex gap-3 mt-3 text-[11.5px] font-bold opacity-90 flex-wrap">
               {weaning && <span>Weaning · {niceDate(weaning)}</span>}
               {vaccine && <span>Vaccine #1 · {niceDate(vaccine)}</span>}
@@ -142,7 +166,12 @@ export default function Home() {
         ) : (
           <>
             {/* UP NEXT */}
-            {allDone ? (
+            {total === 0 ? (
+              <Card className="p-5 text-center">
+                <div className="text-[15px] font-extrabold">Nothing scheduled today</div>
+                <div className="text-[12.5px] text-faint font-semibold mt-1">Enjoy the quiet — the plan picks back up soon.</div>
+              </Card>
+            ) : allDone ? (
               <div className="rounded-[18px] p-5 text-white" style={{ background: '#123f2d' }}>
                 <div className="text-[16px] font-extrabold">Everything's done for today 🎉</div>
                 <div className="text-[12.5px] font-semibold opacity-80 mt-1">Nice work — check back tomorrow.</div>

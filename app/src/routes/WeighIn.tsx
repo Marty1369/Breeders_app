@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
+import { useAuth } from '../state/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { Button, CollarAvatar, EmptyState, PageHeader, SegmentedControl } from '../components/ui';
 import { todayStr, diffDays } from '../lib/dates';
 import { effectiveDate, hasWeightAlert } from '../lib/scheduling';
 import { deltaVerdict, previousWeight, type DeltaTone } from '../lib/puppyDelta';
-import { notifyMembers } from '../lib/actions';
+import { notifyMembers, setOccurrence } from '../lib/actions';
+import { checkKey, occurrencesForDate } from '../lib/recurrence';
+import type { RuleCheck } from '../lib/types';
 
 const TONE: Record<DeltaTone, { bg: string; fg: string }> = {
   good: { bg: '#e3f1ea', fg: '#17805a' },
@@ -17,7 +20,8 @@ const TONE: Record<DeltaTone, { bg: string; fg: string }> = {
 const QUICK = [35, 45, 55];
 
 export default function WeighIn() {
-  const { litters, activeLitterId, puppies, members, space } = useSpace();
+  const { litters, activeLitterId, puppies, members, space, recurrenceRules, ruleChecks } = useSpace();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const litter = litters.find((l) => l.id === activeLitterId);
   const litterPuppies = puppies
@@ -26,6 +30,7 @@ export default function WeighIn() {
   const today = todayStr();
 
   const [session, setSession] = useState<'am' | 'pm'>('am');
+  const [mode, setMode] = useState<'all' | 'solo'>('all');
   const [focusId, setFocusId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [saved, setSaved] = useState<Record<string, number>>({});
@@ -69,6 +74,7 @@ export default function WeighIn() {
     litterPuppies.find((p) => !isWeighed(p.id)) ||
     null;
 
+  const focusIdx = focusPup ? litterPuppies.findIndex((p) => p.id === focusPup.id) : -1;
   const prevWeight = focusPup ? previousWeight(focusPup.weigh_log, today, session) : null;
   const typed = input.trim() === '' ? null : Number(input);
   const verdict = typed != null && Number.isFinite(typed) ? deltaVerdict(typed, prevWeight) : null;
@@ -110,6 +116,17 @@ export default function WeighIn() {
       }
       setAlerted(true);
     }
+    // Mark today's weigh-in occurrence(s) done so Home's "Up next" clears (§5.3).
+    if (space && litter) {
+      const cMap = new Map<string, RuleCheck>();
+      for (const c of ruleChecks) cMap.set(checkKey(c.rule_id, c.occ_date, c.occ_time), c);
+      const occs = occurrencesForDate(recurrenceRules, cMap, today, litter.dates, litter.id, today);
+      await Promise.all(
+        occs
+          .filter((o) => /weigh/i.test(o.rule.name) && o.check?.status !== 'done')
+          .map((o) => setOccurrence(space.id, o.rule.id, o.date, o.time, 'done', user?.id)),
+      );
+    }
     navigate('/');
   };
 
@@ -130,11 +147,16 @@ export default function WeighIn() {
         subtitle={`${litter.name}${ageDays != null && ageDays >= 0 ? ` · day ${ageDays}` : ''} · aim for +30–70 g`}
       />
 
-      <div className="mb-4">
+      <div className="mb-4 grid grid-cols-2 gap-2">
         <SegmentedControl
           value={session}
           onChange={setSession}
           options={[{ value: 'am', label: 'Morning' }, { value: 'pm', label: 'Evening' }]}
+        />
+        <SegmentedControl
+          value={mode}
+          onChange={setMode}
+          options={[{ value: 'all', label: 'All' }, { value: 'solo', label: '1-by-1' }]}
         />
       </div>
 
@@ -164,6 +186,52 @@ export default function WeighIn() {
               <Button onClick={finish} disabled={busy} className="mt-4 w-full !bg-[#7fd4ae] !text-[#123f2d] hover:!bg-[#6ec79f]">
                 Done — back home ✓
               </Button>
+            </div>
+          ) : mode === 'solo' && focusPup ? (
+            <div className="rounded-[20px] border border-card-border bg-card p-5">
+              <div className="flex justify-center gap-1.5 mb-4">
+                {litterPuppies.map((p) => (
+                  <span key={p.id} className="w-2 h-2 rounded-full" style={{ background: isWeighed(p.id) ? '#17805a' : p.id === focusPup.id ? '#191c1a' : '#cfd4cf' }} />
+                ))}
+              </div>
+              <div className="flex flex-col items-center text-center">
+                <CollarAvatar name={focusPup.name} collar={focusPup.collar_color} size={92} />
+                <div className="text-[18px] font-extrabold mt-2">{focusPup.name}</div>
+                <div className="text-[12.5px] text-faint font-semibold">
+                  {focusPup.sex === 'female' ? '♀' : focusPup.sex === 'male' ? '♂' : '—'}
+                  {focusPup.collar_color ? ` · ${focusPup.collar_color} collar` : ''}
+                </div>
+                <div className="text-[12.5px] text-faint font-semibold mt-1">{prevWeight != null ? `yesterday ${prevWeight} g` : 'first weigh-in'}</div>
+                <input
+                  autoFocus
+                  type="number"
+                  inputMode="numeric"
+                  placeholder={prevWeight != null ? String(prevWeight) : 'grams'}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') saveFocused(); }}
+                  className="w-full max-w-[240px] text-center text-[48px] font-extrabold mt-3 px-3 py-1 rounded-[14px] border border-border bg-white text-ink placeholder:text-faint tabular-nums"
+                />
+                {verdict && (
+                  <span className="mt-2 px-3 py-1.5 rounded-full text-[14px] font-extrabold" style={{ background: TONE[verdict.tone].bg, color: TONE[verdict.tone].fg }}>{verdict.label}</span>
+                )}
+                {prevWeight != null && (
+                  <div className="flex gap-2 mt-3 w-full max-w-[300px]">
+                    {QUICK.map((d) => (
+                      <button key={d} onClick={() => setInput(String(prevWeight + d))} className="flex-1 py-2 rounded-full text-[13px] font-extrabold bg-chip-bg text-muted hover:bg-accent-soft hover:text-accent cursor-pointer">+{d} g</button>
+                    ))}
+                  </div>
+                )}
+                <div className="text-[12px] text-faint font-semibold mt-3">Expected at day {ageDays ?? '—'}: roughly +30 to +70 g</div>
+                <div className="flex items-center gap-2 mt-4 w-full">
+                  {focusIdx > 0 && (
+                    <button onClick={() => { setFocusId(litterPuppies[focusIdx - 1].id); setInput(''); }} className="px-3 py-2 rounded-[10px] text-[13px] font-extrabold text-muted hover:bg-muted-bg cursor-pointer">‹ Prev</button>
+                  )}
+                  <Button onClick={saveFocused} disabled={!inputValid || busy} className="flex-1 !min-h-12">
+                    {doneCount === total - 1 ? 'Save · last one!' : 'Save · next ›'}
+                  </Button>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="flex flex-col gap-2.5">
@@ -263,8 +331,8 @@ export default function WeighIn() {
         </>
       )}
 
-      {/* Sticky save bar (hidden once all are weighed). */}
-      {total > 0 && !allDone && focusPup && (
+      {/* Sticky save bar — All mode only (1-by-1 has its own save button). */}
+      {mode === 'all' && total > 0 && !allDone && focusPup && (
         <div className="fixed bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-app-bg via-app-bg to-transparent px-4 pt-6 pb-4 sm:pb-6">
           <div className="max-w-xl mx-auto">
             <Button onClick={saveFocused} disabled={!inputValid || busy} className="w-full !min-h-14 !text-[15px]">
