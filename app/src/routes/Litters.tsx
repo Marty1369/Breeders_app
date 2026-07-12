@@ -122,7 +122,7 @@ export default function Litters() {
                             <div className="relative flex-none pointer-events-auto">
                               <button
                                 aria-label="Litter options"
-                                onClick={() => setMenuId(menuId === l.id ? null : l.id)}
+                                onClick={(e) => { e.stopPropagation(); setMenuId(menuId === l.id ? null : l.id); }}
                                 className="w-8 h-8 grid place-items-center rounded-full text-muted hover:bg-muted-bg cursor-pointer text-[18px] leading-none"
                               >
                                 ⋯
