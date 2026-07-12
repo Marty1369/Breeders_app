@@ -15,7 +15,7 @@ import { STAGE_LABEL as PHASE_LABEL, STAGE_COLOR as PHASE_COLOR, STAGE_ORDER as 
 const DAY_W = 20;
 const ROW_H = 28;
 const HEAD_H = 24;
-const NAME_W = 172;
+const NAME_W = 0; // names now live on the bars, not in a frozen left column
 
 const LATE_COLOR = '#c0392b';
 const TODAY_LINE = '#334155';
@@ -271,63 +271,66 @@ function GanttChart({
             ))}
           </svg>
 
-          {/* Bars */}
+          {/* Phase group labels — pinned to the left over the empty separator rows */}
+          {entries.map((e, i) =>
+            e.kind === 'phase' ? (
+              <div
+                key={`p${i}`}
+                className="absolute font-extrabold text-[11px] whitespace-nowrap z-[15] px-1 rounded"
+                style={{ position: 'sticky', left: 4, top: e.y + 6, width: 'fit-content', color: PHASE_COLOR[e.phase], background: 'var(--color-card)' }}
+              >
+                {PHASE_LABEL[e.phase]}
+              </div>
+            ) : null,
+          )}
+
+          {/* Bars — each labelled with its task name (inside if it fits, else to the right) */}
           {entries.map((e) => {
             if (e.kind !== 'task') return null;
             const t = e.task!;
             const x = xOf(t.start_date);
             const w = Math.max(DAY_W, (diffDays(t.start_date, t.due_date ?? t.start_date) + 1) * DAY_W);
             const style = barStyle(t, e.phase, today);
+            const nameFits = w > t.name.length * 6.2 + 20;
+            const late = style.lateDays > 0;
             return (
               <div key={t.id}>
                 <button
                   onClick={() => onOpen(t)}
                   className="absolute rounded-[6px] cursor-pointer flex items-center gap-1 px-1.5 overflow-hidden z-[5]"
                   style={{
-                    left: NAME_W + x,
+                    left: x,
                     top: e.y + 4,
                     width: w,
                     height: ROW_H - 8,
                     background: style.bg,
                     opacity: style.opacity,
-                    boxShadow: style.lateDays > 0 ? `0 0 0 2px ${LATE_COLOR}` : undefined,
+                    boxShadow: late ? `0 0 0 2px ${LATE_COLOR}` : undefined,
                   }}
                   title={`${t.name} · ${niceDate(t.start_date)}${t.duration_days ? `–${niceDate(t.due_date ?? t.start_date)}` : ''}`}
                 >
                   {style.done && <span className="text-white text-[10px] font-extrabold flex-none">✓</span>}
-                  {w > 44 && <span className="text-white text-[9px] font-bold truncate">{niceDate(t.start_date)}</span>}
+                  {nameFits && (
+                    <span className={`text-white text-[10.5px] font-semibold truncate ${style.done ? 'line-through' : ''}`}>{t.name}</span>
+                  )}
                 </button>
-                {style.lateDays > 0 && (
-                  <span className="absolute text-[9px] font-extrabold whitespace-nowrap" style={{ left: NAME_W + x + w + 4, top: e.y + 8, color: LATE_COLOR }}>
-                    {style.lateDays} day{style.lateDays === 1 ? '' : 's'} late
+                {!nameFits && (
+                  <button
+                    onClick={() => onOpen(t)}
+                    className={`absolute text-[11px] font-semibold whitespace-nowrap cursor-pointer hover:text-accent text-left ${style.done ? 'line-through text-faint' : ''}`}
+                    style={{ left: x + w + 6, top: e.y + 6, color: late ? LATE_COLOR : undefined }}
+                  >
+                    {t.name}{late ? ` · ${style.lateDays}d late` : ''}
+                  </button>
+                )}
+                {nameFits && late && (
+                  <span className="absolute text-[10px] font-extrabold whitespace-nowrap" style={{ left: x + w + 6, top: e.y + 7, color: LATE_COLOR }}>
+                    {style.lateDays}d late
                   </span>
                 )}
               </div>
             );
           })}
-
-          {/* Frozen task-name column — sticky-left so labels stay visible when
-              you scroll the chart horizontally on a phone. */}
-          <div style={{ position: 'sticky', left: 0, width: NAME_W, height, zIndex: 16 }}>
-            <div className="absolute inset-0 bg-card border-r border-border-soft" />
-            {entries.map((e, i) =>
-              e.kind === 'phase' ? (
-                <div key={`pn${i}`} className="absolute font-extrabold text-[11px]" style={{ left: 8, top: e.y + 6, color: PHASE_COLOR[e.phase] }}>
-                  {PHASE_LABEL[e.phase]}
-                </div>
-              ) : (
-                <button
-                  key={`n${e.task!.id}`}
-                  onClick={() => onOpen(e.task!)}
-                  title={e.task!.name}
-                  className={`absolute text-[12px] font-semibold truncate cursor-pointer hover:text-accent text-left ${e.task!.status === 'done' ? 'text-faint line-through' : ''}`}
-                  style={{ left: 8, top: e.y + 6, width: NAME_W - 14 }}
-                >
-                  {e.task!.name}
-                </button>
-              ),
-            )}
-          </div>
         </div>
       </div>
     </div>
