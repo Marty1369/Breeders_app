@@ -23,9 +23,12 @@ export default function NewLitterWizard({
   onClose,
   prefillDam,
   prefillSire,
+  routeBacked = false,
 }: {
   open: boolean;
   onClose: () => void;
+  /** True when mounted by the /litters/new route — the URL owns back/close then. */
+  routeBacked?: boolean;
   prefillDam?: Dog | null;
   prefillSire?: Dog | null;
 }) {
@@ -128,6 +131,8 @@ export default function NewLitterWizard({
     <Sheet
       open={open}
       onClose={onClose}
+      backClose={!routeBacked}
+      busy={busy}
       title="New litter"
       subtitle={`~${taskTemplates.reduce((n, t) => n + (t.repeat?.count ?? 1), 0)} tasks will be generated automatically`}
       footer={

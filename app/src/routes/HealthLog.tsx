@@ -25,9 +25,10 @@ export default function HealthLog() {
   const [product, setProduct] = useState('');
   const [date, setDate] = useState(todayStr());
   // ?puppy=<id> (from a puppy profile) pre-selects that puppy in "applies to".
+  // Only ids belonging to the current litter are accepted (QA F5).
   const [scope, setScope] = useState<'all' | string[]>(() => {
     const pre = new URLSearchParams(window.location.search).get('puppy');
-    return pre ? [pre] : 'all';
+    return pre && litterPuppies.some((p) => p.id === pre) ? [pre] : 'all';
   });
   const [busy, setBusy] = useState(false);
 
@@ -50,6 +51,9 @@ export default function HealthLog() {
 
   const save = async () => {
     if (!space || !product.trim() || litterClosed) return;
+    // Belt-and-braces: never persist puppy ids outside this litter (QA F5).
+    const appliesTo = scope === 'all' ? 'all' : scope.filter((id) => litterPuppies.some((p) => p.id === id));
+    if (appliesTo !== 'all' && appliesTo.length === 0) return;
     setBusy(true);
     await supabase.from('health_entries').insert({
       space_id: space.id,
@@ -57,7 +61,7 @@ export default function HealthLog() {
       type,
       product: product.trim(),
       date,
-      applies_to: scope,
+      applies_to: appliesTo,
       by_user_id: user?.id,
     });
     setBusy(false);

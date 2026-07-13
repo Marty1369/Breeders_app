@@ -4,6 +4,7 @@ import { useAuth } from '../state/AuthProvider';
 import { Button, Card, Chip, EmptyState, PageHeader, Select, Sheet, TextField, safeColor } from '../components/ui';
 import { longDate, todayStr } from '../lib/dates';
 import { recomputeLitterDates, setActualDate } from '../lib/scheduling';
+import { isLitterTerminal } from '../lib/stages';
 import { startWhelping, logBirth, saveBirthDetails, finishWhelping, computeDateShifts } from '../lib/actions';
 import type { BirthEvent } from '../lib/types';
 
@@ -46,6 +47,9 @@ export default function BirthLog() {
   const retained = deliveries - placentas;
   const started = !!session?.started_at;
   const finished = !!session?.ended_at;
+  // An archived litter's birth record is history — viewable, never writable
+  // (finishWhelping would even flip a closed litter back to 'born').
+  const locked = isLitterTerminal(litter);
 
   // Finish preview (spec §6): the birth date to be set (earliest delivery) and
   // how many rearing tasks will shift when it cascades.
@@ -91,6 +95,13 @@ export default function BirthLog() {
         )}
 
         {!started ? (
+          locked ? (
+            <Card className="p-5 text-center">
+              <div className="text-[13px] font-bold text-muted">
+                {litter.name} is archived — the birth log is read-only.
+              </div>
+            </Card>
+          ) : (
           <Card className="p-5 text-center">
             <div className="text-[13px] font-bold text-muted mb-3">
               Opening the birth log lets your team know whelping has started. You can add details later —
@@ -98,6 +109,7 @@ export default function BirthLog() {
             </div>
             <Button onClick={begin} disabled={busy}>Start whelping</Button>
           </Card>
+          )
         ) : (
           <>
             <div className="rounded-[14px] px-4 py-3 mb-3 bg-white/10">
@@ -112,7 +124,7 @@ export default function BirthLog() {
               </div>
             )}
 
-            {!finished && (
+            {!finished && !locked && (
               <div className="flex gap-3 mb-5">
                 <Button onClick={() => add('born')} disabled={busy} className="flex-1 !min-h-16 !text-[15px]">
                   ＋ Puppy born
@@ -169,12 +181,14 @@ export default function BirthLog() {
                 })}
             </div>
 
-            {finished ? (
+            {finished || locked ? (
               <div className="text-center">
-                <Chip tone="accent">Whelping complete</Chip>
-                <div className="text-[10.5px] text-white/40 font-semibold mt-2">
-                  Birth date set to {longDate((session?.ended_at ?? new Date().toISOString()).slice(0, 10))} · rearing tasks unlocked
-                </div>
+                <Chip tone="accent">{finished ? 'Whelping complete' : 'Litter archived — log is read-only'}</Chip>
+                {finished && (
+                  <div className="text-[10.5px] text-white/40 font-semibold mt-2">
+                    Birth date set to {longDate((session?.ended_at ?? new Date().toISOString()).slice(0, 10))} · rearing tasks unlocked
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -199,6 +213,7 @@ export default function BirthLog() {
       <BirthDetailSheet event={editEvent} puppyName={editEvent ? puppyNameFor(editEvent) : undefined} onClose={() => setEditEvent(null)} />
 
       <Sheet
+        busy={busy}
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
         title="Finish whelping?"
@@ -285,6 +300,7 @@ function BirthDetailSheet({ event, puppyName, onClose }: { event: BirthEvent | n
 
   return (
     <Sheet
+      busy={busy}
       open={!!event}
       onClose={onClose}
       title={event.type === 'stillborn' ? `Stillborn #${event.seq}` : puppyName || `Puppy #${event.seq}`}

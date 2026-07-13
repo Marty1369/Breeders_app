@@ -13,8 +13,11 @@ export default function Docs() {
   const fileInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // "This litter" (active-litter filtered) vs "All litters" (every doc in the space).
-  const [scope, setScope] = useState<'litter' | 'all'>('litter');
+  // "This litter" (active-litter filtered) vs "All litters" (every doc in the
+  // space). ?scope=all lets search results land on a kennel-level upload.
+  const [scope, setScope] = useState<'litter' | 'all'>(() =>
+    new URLSearchParams(window.location.search).get('scope') === 'all' ? 'all' : 'litter',
+  );
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 

@@ -22,6 +22,7 @@ export default function FailedPregnancySheet({ litter, onClose }: { litter: Litt
     <Sheet
       open={!!litter}
       onClose={onClose}
+      busy={busy}
       title="End plan — did not take"
       subtitle={litter?.name}
       footer={

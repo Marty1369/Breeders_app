@@ -32,7 +32,7 @@ function relDate(startDate: string, today: string, done: boolean): { label: stri
 }
 
 export default function Timeline({ mode = 'both', embedded = false }: { mode?: 'both' | 'list' | 'calendar'; embedded?: boolean }) {
-  const { litters, tasks, activeLitterId, members } = useSpace();
+  const { litters, tasks, activeLitterId, setActiveLitterId, members } = useSpace();
   const [params, setParams] = useSearchParams();
   const [view, setView] = useState<'list' | 'calendar'>(mode === 'calendar' ? 'calendar' : 'list');
   const [phase, setPhase] = useState<TaskPhase | 'all'>('all');
@@ -58,6 +58,9 @@ export default function Timeline({ mode = 'both', embedded = false }: { mode?: '
     if (!deepLinkId) return;
     const t = tasks.find((x) => x.id === deepLinkId);
     if (!t) return; // tasks may still be loading — retry on the next data tick
+    // A cross-litter link (manual URL) must also switch the litter focus, or
+    // editing the task would compute anchors from the wrong litter's dates.
+    if (t.litter_id !== activeLitterId) setActiveLitterId(t.litter_id);
     setDetailTask(t);
     params.delete('task');
     setParams(params, { replace: true });

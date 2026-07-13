@@ -164,6 +164,7 @@ export default function TaskFormSheet({
     <Sheet
       open={open}
       onClose={onClose}
+      busy={busy}
       title={editing ? 'Edit task' : 'New task'}
       footer={
         <>

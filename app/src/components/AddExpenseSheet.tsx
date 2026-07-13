@@ -3,6 +3,7 @@ import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
 import { Button, Select, Sheet, TextField } from './ui';
 import { todayStr } from '../lib/dates';
+import { isLitterTerminal } from '../lib/stages';
 import type { ExpenseCategory } from '../lib/types';
 
 const CATS: { value: ExpenseCategory; label: string }[] = [
@@ -17,7 +18,7 @@ const CATS: { value: ExpenseCategory; label: string }[] = [
 ];
 
 export default function AddExpenseSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { space, activeLitterId, payers } = useSpace();
+  const { space, activeLitterId, litters, payers } = useSpace();
   const [desc, setDesc] = useState('');
   const [amount, setAmount] = useState('');
   const [cat, setCat] = useState<ExpenseCategory>('vet_tests');
@@ -33,6 +34,13 @@ export default function AddExpenseSheet({ open, onClose }: { open: boolean; onCl
 
   async function save() {
     if (!space || !amountValid) return;
+    // Screen-level guards can be raced by deep links (?new=1 before litters
+    // load) — the write itself must refuse a terminal litter (QA F4).
+    const litter = litters.find((l) => l.id === activeLitterId);
+    if (litter && isLitterTerminal(litter)) {
+      setError(`${litter.name} is closed — its books are final. Switch litters to add an expense.`);
+      return;
+    }
     setBusy(true);
     setError(null);
     let finalPayerId = payerId;
@@ -69,6 +77,7 @@ export default function AddExpenseSheet({ open, onClose }: { open: boolean; onCl
 
   return (
     <Sheet
+      busy={busy}
       open={open}
       onClose={onClose}
       title="Add expense"

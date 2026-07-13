@@ -78,7 +78,15 @@ export default function CompleteTaskSheet({ task, onClose }: { task: Task | null
     else if (resultType === 'weight') resultLog = { type: 'weight', value, unit: 'g' };
     else if (resultType === 'note') resultLog = { type: 'note', value };
 
-    await completeTaskWithResult(task, resultLog, litter, tasks, members, user?.id, recurrenceRules);
+    try {
+      await completeTaskWithResult(task, resultLog, litter, tasks, members, user?.id, recurrenceRules);
+    } catch (e) {
+      // The task/litter write (or the ovulation cascade) failed — keep the
+      // sheet open so nothing looks saved when it isn't.
+      setBusy(false);
+      setError(e instanceof Error ? e.message : 'Could not save the result. Try again.');
+      return;
+    }
 
     if (expWanted) {
       const { error: expErr } = await supabase.from('expenses').insert({
@@ -111,6 +119,7 @@ export default function CompleteTaskSheet({ task, onClose }: { task: Task | null
   return (
     <>
       <Sheet
+        busy={busy}
         open={!!task && !confirmEndPlan}
         onClose={() => {
           reset();

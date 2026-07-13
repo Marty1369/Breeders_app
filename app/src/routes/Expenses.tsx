@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
@@ -44,6 +44,11 @@ export default function Expenses() {
   // did-not-take) active litter blocks adding — including the ?new=1 deep link.
   const litterClosed = !!litter && isLitterTerminal(litter);
   const [addOpen, setAddOpen] = useState(params.get('new') === '1' && !litterClosed);
+  // The initial guard can be raced by a deep link firing before litters load —
+  // close the sheet if the litter turns out to be terminal (QA F4).
+  useEffect(() => {
+    if (litterClosed && addOpen) setAddOpen(false);
+  }, [litterClosed, addOpen]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   // "This litter" (active-litter scoped) vs "All litters" (whole space aggregated).
   const [scope, setScope] = useState<'litter' | 'all'>('litter');

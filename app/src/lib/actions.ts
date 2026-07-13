@@ -146,7 +146,8 @@ export async function completeTaskWithResult(
   actorUserId?: string,
   rules: RecurrenceRule[] = []
 ) {
-  await supabase.from('tasks').update({ status: 'done', result_log: resultLog }).eq('id', task.id);
+  const { error: taskErr } = await supabase.from('tasks').update({ status: 'done', result_log: resultLog }).eq('id', task.id);
+  if (taskErr) throw taskErr; // the caller keeps its sheet open and shows this
 
   if (!litter) return { confirmedOvulation: false };
 

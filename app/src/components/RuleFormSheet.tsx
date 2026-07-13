@@ -131,6 +131,7 @@ export default function RuleFormSheet({
     <Sheet
       open={open}
       onClose={onClose}
+      busy={busy}
       title={editing ? 'Edit repeat' : 'New repeat'}
       subtitle="A task that recurs on a schedule"
       footer={

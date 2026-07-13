@@ -113,6 +113,7 @@ export default function DogFormSheet({
     <Sheet
       open={open}
       onClose={onClose}
+      busy={busy}
       title={isEdit ? `Edit — ${dog?.name ?? ''}` : defaultSex === 'male' ? 'Add sire' : 'Add dog'}
       subtitle={isEdit ? undefined : 'Mum, dad, or external stud'}
       footer={

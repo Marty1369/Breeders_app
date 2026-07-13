@@ -39,6 +39,7 @@ export default function HandoverChecklistSheet({ puppy, onClose }: { puppy: Pupp
 
   return (
     <Sheet
+      busy={busy}
       open={!!puppy}
       onClose={onClose}
       title="Handover checklist"

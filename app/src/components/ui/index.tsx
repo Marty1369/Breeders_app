@@ -335,7 +335,7 @@ export function SegmentedControl<T extends string>({
   );
 }
 
-export function Sheet({ open, onClose, title, subtitle, children, footer, busy }: {
+export function Sheet({ open, onClose, title, subtitle, children, footer, busy, backClose = true }: {
   open: boolean;
   onClose: () => void;
   title: string;
@@ -344,6 +344,8 @@ export function Sheet({ open, onClose, title, subtitle, children, footer, busy }
   footer?: ReactNode;
   /** While true, the Android back gesture won't close the sheet (save in flight). */
   busy?: boolean;
+  /** Route-backed sheets (URL owns open/close) must NOT register a history sentinel. */
+  backClose?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -355,9 +357,9 @@ export function Sheet({ open, onClose, title, subtitle, children, footer, busy }
   const busyRef = useRef(!!busy);
   busyRef.current = !!busy;
   useEffect(() => {
-    if (!open) return;
+    if (!open || !backClose) return;
     return registerOverlay(() => closeRef.current(), () => busyRef.current);
-  }, [open]);
+  }, [open, backClose]);
 
   // Modal a11y: focus the panel on open, trap Tab within it, Escape closes,
   // and focus returns to the opener on close.

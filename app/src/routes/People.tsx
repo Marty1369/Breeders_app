@@ -207,6 +207,7 @@ export function AddOwnerSheet({ open, onClose }: { open: boolean; onClose: () =>
 
   return (
     <Sheet
+      busy={busy}
       open={open}
       onClose={onClose}
       title="Add owner"

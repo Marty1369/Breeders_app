@@ -301,10 +301,12 @@ function dogName(dogs: Dog[], id: string | null): string {
 // sheet for context; closing returns to the list.
 function NewLitterRoute() {
   const navigate = useNavigate();
+  // replace: closing must not leave /litters/new in history, or Back would
+  // reopen the wizard right after cancelling/creating (QA F6).
   return (
     <>
       <Litters />
-      <NewLitterWizard open onClose={() => navigate('/litters')} />
+      <NewLitterWizard open routeBacked onClose={() => navigate('/litters', { replace: true })} />
     </>
   );
 }

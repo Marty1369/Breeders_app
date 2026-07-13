@@ -185,6 +185,7 @@ function LogHeatSheet({ dog, onClose }: { dog: Dog | null; onClose: () => void }
 
   return (
     <Sheet
+      busy={busy}
       open={!!dog}
       onClose={onClose}
       title={`Log heat — ${dog?.name ?? ''}`}

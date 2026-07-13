@@ -37,8 +37,13 @@ export default function Search() {
     navigate(`/plan?task=${t.id}`);
   };
   const openUpload = (u: Upload) => {
-    if (u.litter_id) setActiveLitterId(u.litter_id);
-    navigate('/docs');
+    if (u.litter_id) {
+      setActiveLitterId(u.litter_id);
+      navigate('/docs');
+    } else {
+      // Kennel-level file — the litter scope would hide it (QA F8).
+      navigate('/docs?scope=all');
+    }
   };
 
   return (
