@@ -37,9 +37,11 @@ export default function CompleteTaskSheet({ task, onClose }: { task: Task | null
   const [expPayer, setExpPayer] = useState('');
   const [expDesc, setExpDesc] = useState('');
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [confirmEndPlan, setConfirmEndPlan] = useState(false);
 
   function reset() {
+    setError(null);
     setResultType('none');
     setValue('');
     setProgUnit('nmol/l');
@@ -59,6 +61,15 @@ export default function CompleteTaskSheet({ task, onClose }: { task: Task | null
 
   async function save() {
     if (!task) return;
+    setError(null);
+    // Validate the expense before completing the task, so a bad amount can't
+    // leave the task done but the expense silently missing (TASK-13).
+    const expWanted = attachExpense && !!space;
+    const expNum = Number(expAmount);
+    if (expWanted && (!expAmount || !Number.isFinite(expNum) || expNum <= 0)) {
+      setError('Enter a valid expense amount (more than 0).');
+      return;
+    }
     setBusy(true);
 
     let resultLog: Task['result_log'] = null;
@@ -69,17 +80,22 @@ export default function CompleteTaskSheet({ task, onClose }: { task: Task | null
 
     await completeTaskWithResult(task, resultLog, litter, tasks, members, user?.id, recurrenceRules);
 
-    if (attachExpense && space && expAmount) {
-      await supabase.from('expenses').insert({
-        space_id: space.id,
+    if (expWanted) {
+      const { error: expErr } = await supabase.from('expenses').insert({
+        space_id: space!.id,
         litter_id: task.litter_id,
         date: todayStr(),
         description: expDesc || task.name,
         category: expCat,
-        amount_eur: Number(expAmount),
+        amount_eur: expNum,
         payer_id: expPayer || null,
         task_id: task.id,
       });
+      if (expErr) {
+        setBusy(false);
+        setError(`Task completed, but the expense failed to save: ${expErr.message}. Fix and press Save to retry.`);
+        return;
+      }
     }
 
     setBusy(false);
@@ -110,6 +126,7 @@ export default function CompleteTaskSheet({ task, onClose }: { task: Task | null
         }
       >
         <div className="flex flex-col gap-3">
+          {error && <div className="text-[12px] font-bold text-danger">{error}</div>}
           <Select label="Log a result (optional)" value={resultType} onChange={(e) => setResultType(e.target.value as ResultType)}>
             <option value="none">No result to log</option>
             <option value="progesterone">Progesterone test</option>

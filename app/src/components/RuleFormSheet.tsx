@@ -31,9 +31,11 @@ export default function RuleFormSheet({
   const [endCount, setEndCount] = useState(10);
   const [assignees, setAssignees] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    setError(null);
     if (rule) {
       setName(rule.name);
       setScope(rule.scope);
@@ -94,20 +96,32 @@ export default function RuleFormSheet({
       end_anchor: null,
       end_offset: null,
     };
+    setError(null);
+    let dbError: { message: string } | null = null;
     if (editing && rule) {
-      await supabase.from('recurrence_rules').update(payload).eq('id', rule.id);
+      ({ error: dbError } = await supabase.from('recurrence_rules').update(payload).eq('id', rule.id));
     } else {
-      await supabase.from('recurrence_rules').insert({ ...payload, paused: false });
+      ({ error: dbError } = await supabase.from('recurrence_rules').insert({ ...payload, paused: false }));
     }
     setBusy(false);
+    if (dbError) {
+      // A failed write must not close the sheet as if it saved (TASK-13).
+      setError(dbError.message || 'Could not save the repeat. Try again.');
+      return;
+    }
     onClose();
   }
 
   async function remove() {
     if (!rule) return;
     setBusy(true);
-    await supabase.from('recurrence_rules').delete().eq('id', rule.id);
+    setError(null);
+    const { error: dbError } = await supabase.from('recurrence_rules').delete().eq('id', rule.id);
     setBusy(false);
+    if (dbError) {
+      setError(dbError.message || 'Could not delete the repeat. Try again.');
+      return;
+    }
     onClose();
   }
 
@@ -128,6 +142,7 @@ export default function RuleFormSheet({
       }
     >
       <div className="flex flex-col gap-3">
+        {error && <div className="text-[12px] font-bold text-danger">{error}</div>}
         <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Weigh puppies" autoFocus />
 
         <div>

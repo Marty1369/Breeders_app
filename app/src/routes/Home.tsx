@@ -9,9 +9,10 @@ import { addDays, diffDays, niceDate, parseDate, todayStr } from '../lib/dates';
 import { effectiveDate, hasWeightAlert, recomputeLitterDates, setActualDate, tasksFromTemplates } from '../lib/scheduling';
 import { litterProgress } from '../lib/stages';
 import { checkKey, occurrencesForDate, defaultRulesForLitter, type Occurrence } from '../lib/recurrence';
-import { markTaskDone, setOccurrence } from '../lib/actions';
+import { markTaskDone, setOccurrence, isLoggable } from '../lib/actions';
 import JourneyRibbon, { type Stop } from '../components/JourneyRibbon';
-import type { Dog, Puppy, RuleCheck } from '../lib/types';
+import CompleteTaskSheet from '../components/task/CompleteTaskSheet';
+import type { Dog, Puppy, RuleCheck, Task } from '../lib/types';
 
 // Home = the one daily surface (spec §3): merges the old Today + Dashboard.
 // The journey ribbon (§3.2) lands in P3.
@@ -38,6 +39,7 @@ export default function Home() {
     taskTemplates, activeLitterId, setActiveLitterId,
   } = useSpace();
   const [seeding, setSeeding] = useState(false);
+  const [completeTask, setCompleteTask] = useState<Task | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
   const today = todayStr();
@@ -177,7 +179,12 @@ export default function Home() {
       name: t.name,
       time: '',
       who: members.find((m) => t.assignee_ids.includes(m.user_id)) ?? null,
-      onToggle: () => markTaskDone(t, t.status !== 'done'),
+      // Progesterone/ultrasound must record a result — a plain check-off here
+      // would skip the ovulation cascade and the pregnant flip (CASC-09).
+      onToggle: () => {
+        if (t.status !== 'done' && isLoggable(t)) { setCompleteTask(t); return; }
+        markTaskDone(t, t.status !== 'done');
+      },
       onOpen: () => navigate('/plan'),
     })),
   ];
@@ -318,7 +325,7 @@ export default function Home() {
                       <Button onClick={() => navigate('/weigh-in')} className="w-full">Start</Button>
                     ) : (
                       <Button
-                        onClick={() => (occ ? toggleOcc(occ) : task && markTaskDone(task, true))}
+                        onClick={() => (occ ? toggleOcc(occ) : task && (isLoggable(task) ? setCompleteTask(task) : markTaskDone(task, true)))}
                         className="w-full"
                       >
                         Done ✓
@@ -424,6 +431,7 @@ export default function Home() {
           </>
         )}
       </div>
+      <CompleteTaskSheet task={completeTask} onClose={() => setCompleteTask(null)} />
     </div>
   );
 }

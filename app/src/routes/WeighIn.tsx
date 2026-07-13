@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import { Button, CollarAvatar, EmptyState, PageHeader, SegmentedControl } from '../components/ui';
 import { todayStr, diffDays } from '../lib/dates';
 import { effectiveDate, hasWeightAlert } from '../lib/scheduling';
+import { isLitterTerminal } from '../lib/stages';
 import { deltaVerdict, previousWeight, type DeltaTone } from '../lib/puppyDelta';
 import { notifyMembers, setOccurrence } from '../lib/actions';
 import { checkKey, occurrencesForDate } from '../lib/recurrence';
@@ -51,6 +52,17 @@ export default function WeighIn() {
     return (
       <div className="p-6">
         <EmptyState title="No litter selected" />
+      </div>
+    );
+  }
+
+  if (isLitterTerminal(litter)) {
+    return (
+      <div className="p-6">
+        <EmptyState
+          title={`${litter.name} is closed`}
+          subtitle="Weigh-in history stays on each puppy's profile; new weigh-ins are off for archived litters."
+        />
       </div>
     );
   }

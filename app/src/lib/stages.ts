@@ -8,6 +8,10 @@ import type { Litter, TaskPhase } from './types';
 import { diffDays, niceDate, todayStr } from './dates';
 import { effectiveDate } from './scheduling';
 
+// Terminal litters (closed / did-not-take) are archives — care and money
+// screens must not accept new writes for them (QA DATA-03).
+export const isLitterTerminal = (l: Litter) => l.status === 'closed' || l.status === 'did_not_take';
+
 export const STAGE_ORDER: TaskPhase[] = ['prewhelp', 't1_birth', 't2_wean', 't3_social'];
 
 export const STAGE_LABEL: Record<TaskPhase, string> = {

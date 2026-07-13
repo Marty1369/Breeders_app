@@ -2,7 +2,7 @@
 // notification rules only live in one place.
 
 import { supabase } from './supabase';
-import { applyCascade, cascadePreview, recomputeLitterDates, setActualDate } from './scheduling';
+import { applyCascade, recomputeLitterDates, setActualDate } from './scheduling';
 import { scheduleUpdates } from './dependencies';
 import { reanchorRules } from './recurrence';
 import { fmt, todayStr } from './dates';
@@ -54,11 +54,30 @@ export async function notifyMembers(
   await supabase.from('notifications').insert(rows);
 }
 
+/**
+ * Pure: exactly the task shifts applyDateChange would write — the anchor
+ * cascade plus the dependency re-flow on top of it. Used by both the preview
+ * and the write so "N dates will shift" never overstates (CASC-10).
+ */
+export function computeDateShifts(litterTasks: Task[], newDates: Litter['dates']) {
+  const shifts = applyCascade(litterTasks, newDates);
+  const shiftMap = new Map(shifts.map((s) => [s.id, s]));
+  const updated = litterTasks.map((t) => {
+    const s = shiftMap.get(t.id);
+    return s ? { ...t, start_date: s.start_date, due_date: s.due_date } : t;
+  });
+  const depUpdates = scheduleUpdates(updated);
+  const merged = new Map<string, { id: string; start_date: string; due_date: string | null }>();
+  for (const s of shifts) merged.set(s.id, s);
+  for (const s of depUpdates) merged.set(s.id, s);
+  return [...merged.values()];
+}
+
 /** Preview how many tasks would shift if `key` were set to `value` (before writing anything). */
 export function previewDateChange(litter: Litter, tasks: Task[], key: DateKey, value: string | null) {
   const newDates = setActualDate(litter.dates, key, value);
   const litterTasks = tasks.filter((t) => t.litter_id === litter.id);
-  return { newDates, changed: cascadePreview(litterTasks, litter.dates, newDates) };
+  return { newDates, changed: computeDateShifts(litterTasks, newDates) };
 }
 
 /** Writes the new litter dates and cascades every affected non-pinned task. */
@@ -71,25 +90,12 @@ export async function applyDateChange(
   rules: RecurrenceRule[] = []
 ) {
   const litterTasks = tasks.filter((t) => t.litter_id === litter.id);
-  const shifts = applyCascade(litterTasks, newDatesInput);
+  // Anchor cascade + dependency re-flow, same computation the preview showed.
+  const all = computeDateShifts(litterTasks, newDatesInput);
 
   // Re-anchor the litter's recurrence rules (weigh/box-temp/clean/socialization)
   // to the new dates so the daily-care schedule follows the real whelping date.
   const ruleShifts = reanchorRules(rules, litter.id, newDatesInput);
-
-  // Apply anchor shifts to an in-memory copy, then re-flow task-to-task
-  // dependencies topologically on top of the new anchor dates.
-  const shiftMap = new Map(shifts.map((s) => [s.id, s]));
-  const updated = litterTasks.map((t) => {
-    const s = shiftMap.get(t.id);
-    return s ? { ...t, start_date: s.start_date, due_date: s.due_date } : t;
-  });
-  const depUpdates = scheduleUpdates(updated);
-
-  const merged = new Map<string, { id: string; start_date: string; due_date: string | null }>();
-  for (const s of shifts) merged.set(s.id, s);
-  for (const s of depUpdates) merged.set(s.id, s);
-  const all = [...merged.values()];
 
   const { error: litErr } = await supabase.from('litters').update({ dates: newDatesInput }).eq('id', litter.id);
   if (litErr) throw litErr; // don't cascade tasks off dates that didn't persist
@@ -125,6 +131,11 @@ export async function endPlan(litter: Litter, tasks: Task[], members: SpaceMembe
 export async function markTaskDone(task: Task, done: boolean) {
   await supabase.from('tasks').update({ status: done ? 'done' : 'todo' }).eq('id', task.id);
 }
+
+// Tasks whose completion must record a result (progesterone/ultrasound) because
+// it can re-anchor litter dates or flip status — never complete these with a
+// plain check-off; route them through CompleteTaskSheet.
+export const isLoggable = (t: Task) => /progesterone|ultrasound/i.test(t.name);
 
 export async function completeTaskWithResult(
   task: Task,

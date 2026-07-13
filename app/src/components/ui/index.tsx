@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 import { CheckIcon, XIcon } from '../icons';
+import { registerOverlay } from '../../lib/backClose';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
@@ -334,16 +335,29 @@ export function SegmentedControl<T extends string>({
   );
 }
 
-export function Sheet({ open, onClose, title, subtitle, children, footer }: {
+export function Sheet({ open, onClose, title, subtitle, children, footer, busy }: {
   open: boolean;
   onClose: () => void;
   title: string;
   subtitle?: string;
   children: ReactNode;
   footer?: ReactNode;
+  /** While true, the Android back gesture won't close the sheet (save in flight). */
+  busy?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+
+  // Android back gesture closes the sheet instead of navigating (lib/backClose).
+  // Refs keep the registration stable across re-renders.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  const busyRef = useRef(!!busy);
+  busyRef.current = !!busy;
+  useEffect(() => {
+    if (!open) return;
+    return registerOverlay(() => closeRef.current(), () => busyRef.current);
+  }, [open]);
 
   // Modal a11y: focus the panel on open, trap Tab within it, Escape closes,
   // and focus returns to the opener on close.

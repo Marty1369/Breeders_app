@@ -14,6 +14,7 @@ import {
 } from '../components/icons';
 import LitterSwitcherSheet from '../components/LitterSwitcherSheet';
 import TaskFormSheet from '../components/task/TaskFormSheet';
+import { registerOverlay, closeOverlayThenNavigate } from '../lib/backClose';
 import Home from './Home';
 import Plan from './Plan';
 import Litters from './Litters';
@@ -79,6 +80,13 @@ export default function AppShell() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // The FAB chooser is a custom overlay (not a Sheet) — register it with the
+  // back-gesture manager so Android back closes it instead of navigating.
+  useEffect(() => {
+    if (!fabOpen) return;
+    return registerOverlay(() => setFabOpen(false));
+  }, [fabOpen]);
 
   const activeLitter = litters.find((l) => l.id === activeLitterId) || null;
   const unreadCount = notifications.filter((n) => !n.read_at).length;
@@ -233,8 +241,9 @@ export default function AppShell() {
         </nav>
       )}
 
-      {/* Hide the FAB where a screen has its own sticky primary action bar. */}
-      {!isDesktop && activeLitter && location.pathname !== '/weigh-in' && (
+      {/* Hide the FAB where a screen has its own sticky primary action bar, and
+          on whelping night, where an accidental tap would be harmful. */}
+      {!isDesktop && activeLitter && location.pathname !== '/weigh-in' && location.pathname !== '/whelping' && (
         <button
           aria-label="Add to this litter"
           onClick={() => setFabOpen(true)}
@@ -252,14 +261,16 @@ export default function AppShell() {
             <div className="text-[11px] font-extrabold tracking-wide text-faint mb-2">Add to {activeLitter?.name}</div>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { label: 'Task', run: () => setNewTaskOpen(true) },
-                { label: 'Weigh-in', run: () => navigate('/weigh-in') },
-                { label: 'Expense', run: () => navigate('/expenses') },
-                { label: 'Note', run: () => setNewTaskOpen(true) },
+                // Sheet handoff: plain close+open — the back-gesture sentinel survives.
+                { label: 'Task', run: () => { setFabOpen(false); setNewTaskOpen(true); } },
+                // Route actions: consume the sentinel, then navigate (lib/backClose).
+                { label: 'Weigh-in', run: () => closeOverlayThenNavigate(() => setFabOpen(false), () => navigate('/weigh-in')) },
+                { label: 'Health entry', run: () => closeOverlayThenNavigate(() => setFabOpen(false), () => navigate('/health-log')) },
+                { label: 'Expense', run: () => closeOverlayThenNavigate(() => setFabOpen(false), () => navigate('/expenses?new=1')) },
               ].map((o) => (
                 <button
                   key={o.label}
-                  onClick={() => { setFabOpen(false); o.run(); }}
+                  onClick={o.run}
                   className="py-3 rounded-[12px] bg-muted-bg text-[14px] font-extrabold cursor-pointer hover:bg-accent-soft hover:text-accent"
                 >
                   {o.label}

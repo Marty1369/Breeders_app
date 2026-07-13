@@ -47,9 +47,11 @@ export default function TaskFormSheet({
   const [repeatEvery, setRepeatEvery] = useState(1);
   const [repeatCount, setRepeatCount] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    setError(null);
     if (task) {
       setName(task.name);
       setPhase(task.phase);
@@ -88,10 +90,12 @@ export default function TaskFormSheet({
   async function save() {
     if (!space || !litterId || !name.trim()) return;
     setBusy(true);
+    setError(null);
     const start = computeStart();
 
+    let dbError: { message: string } | null = null;
     if (editing && task) {
-      await supabase
+      ({ error: dbError } = await supabase
         .from('tasks')
         .update({
           name: name.trim(),
@@ -105,7 +109,7 @@ export default function TaskFormSheet({
           assignee_ids: assignees,
           notes: notes || null,
         })
-        .eq('id', task.id);
+        .eq('id', task.id));
     } else {
       const count = Math.max(1, repeatCount);
       const rows = Array.from({ length: count }).map((_, i) => {
@@ -129,17 +133,27 @@ export default function TaskFormSheet({
           status: 'todo' as const,
         };
       });
-      await supabase.from('tasks').insert(rows);
+      ({ error: dbError } = await supabase.from('tasks').insert(rows));
     }
     setBusy(false);
+    if (dbError) {
+      // A failed write must not close the sheet as if it saved (TASK-13).
+      setError(dbError.message || 'Could not save the task. Try again.');
+      return;
+    }
     onClose();
   }
 
   async function remove() {
     if (!task) return;
     setBusy(true);
-    await supabase.from('tasks').delete().eq('id', task.id);
+    setError(null);
+    const { error: dbError } = await supabase.from('tasks').delete().eq('id', task.id);
     setBusy(false);
+    if (dbError) {
+      setError(dbError.message || 'Could not delete the task. Try again.');
+      return;
+    }
     onClose();
   }
 
@@ -157,6 +171,7 @@ export default function TaskFormSheet({
       }
     >
       <div className="flex flex-col gap-3">
+        {error && <div className="text-[12px] font-bold text-danger">{error}</div>}
         <TextField label="Task name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
         <Select label="Phase" value={phase} onChange={(e) => setPhase(e.target.value as TaskPhase)}>
           {PHASES.map((p) => (

@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { useAuth } from '../state/AuthProvider';
+import { supabase } from '../lib/supabase';
 import { Button, Card, Chip, EmptyState, PageHeader, TextField } from '../components/ui';
 import { longDate } from '../lib/dates';
 import { applyDateChange, previewDateChange } from '../lib/actions';
+import { isLitterTerminal } from '../lib/stages';
+import { registerOverlay } from '../lib/backClose';
 import type { DateKey } from '../lib/scheduling';
 import FailedPregnancySheet from '../components/task/FailedPregnancySheet';
 
@@ -19,7 +22,7 @@ const KEYS: { key: DateKey; label: string }[] = [
 
 export default function LitterInfo() {
   const { id } = useParams<{ id: string }>();
-  const { litters, tasks, members, dogs, recurrenceRules } = useSpace();
+  const { litters, tasks, members, dogs, recurrenceRules, activeLitterId, setActiveLitterId } = useSpace();
   const { user } = useAuth();
   const litter = litters.find((l) => l.id === id);
   const [editingKey, setEditingKey] = useState<DateKey | null>(null);
@@ -27,6 +30,18 @@ export default function LitterInfo() {
   const [preview, setPreview] = useState<{ key: DateKey; newDates: ReturnType<typeof previewDateChange>['newDates']; count: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [endPlanOpen, setEndPlanOpen] = useState(false);
+
+  // Both custom overlays close on the Android back gesture, like every Sheet.
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  useEffect(() => {
+    if (!editingKey || preview) return;
+    return registerOverlay(() => setEditingKey(null));
+  }, [editingKey, preview]);
+  useEffect(() => {
+    if (!preview) return;
+    return registerOverlay(() => setPreview(null), () => busyRef.current);
+  }, [preview]);
 
   if (!litter) {
     return (
@@ -88,12 +103,35 @@ export default function LitterInfo() {
         </div>
       </Card>
 
-      <div className="flex flex-wrap gap-2 mt-4">
-        <Link to="/whelping"><Button variant="secondary">Birth log</Button></Link>
-        <Link to="/weigh-in"><Button variant="secondary">Weigh-in</Button></Link>
-        <Link to="/health-log"><Button variant="secondary">Health log</Button></Link>
-        <Link to="/close-out"><Button variant="secondary">Close-out</Button></Link>
-      </div>
+      {/* Care screens read the CURRENT litter, so offering them here for a
+          non-current litter would open (and write to) the wrong one (QA N1). */}
+      {litter.id === activeLitterId ? (
+        <div className="flex flex-wrap gap-2 mt-4">
+          <Link to="/whelping"><Button variant="secondary">Birth log</Button></Link>
+          <Link to="/weigh-in"><Button variant="secondary">Weigh-in</Button></Link>
+          <Link to="/health-log"><Button variant="secondary">Health log</Button></Link>
+          <Link to="/close-out"><Button variant="secondary">Close-out</Button></Link>
+        </div>
+      ) : (
+        <Card className="p-4 mt-4">
+          <div className="text-[12.5px] font-semibold text-muted mb-3">
+            Birth log, weigh-in and health log always open the litter you're looking at.
+            {isLitterTerminal(litter) ? ' This one is archived — you can still view it as current.' : ''}
+          </div>
+          <Button
+            variant="secondary"
+            onClick={async () => {
+              // Mirror the switcher: picking a shelved litter reactivates it.
+              if (!isLitterTerminal(litter) && !litter.is_active) {
+                await supabase.from('litters').update({ is_active: true }).eq('id', litter.id);
+              }
+              setActiveLitterId(litter.id);
+            }}
+          >
+            Make this the current litter
+          </Button>
+        </Card>
+      )}
 
       {litter.status !== 'closed' && litter.status !== 'did_not_take' && (
         <Button variant="danger" className="mt-4" onClick={() => setEndPlanOpen(true)}>

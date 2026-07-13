@@ -75,22 +75,6 @@ export function nextHeatPredicted(lastHeatStart: string): string {
   return addMonths(lastHeatStart, 6);
 }
 
-/** Which non-pinned, anchor+offset tasks would move if litter dates change. */
-export function cascadePreview(
-  tasks: Task[],
-  oldDates: LitterDates,
-  newDates: LitterDates
-): Task[] {
-  return tasks.filter((t) => {
-    if (t.is_pinned_date || t.anchor_mode !== 'anchor+offset' || !t.anchor || t.offset_days == null) return false;
-    const before = effectiveDate(oldDates, t.anchor);
-    const after = effectiveDate(newDates, t.anchor);
-    if (!after) return false;
-    const newStart = addDays(after, t.offset_days);
-    return newStart !== t.start_date || before !== after;
-  });
-}
-
 /** Computes the new start/due dates for tasks affected by a litter-date change. */
 export function applyCascade(
   tasks: Task[],

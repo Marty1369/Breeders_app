@@ -4,6 +4,7 @@ import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
 import { Button, Card, EmptyState, PageHeader, SegmentedControl } from '../components/ui';
 import { longDate } from '../lib/dates';
+import { isLitterTerminal } from '../lib/stages';
 import AddExpenseSheet from '../components/AddExpenseSheet';
 import type { ExpenseCategory } from '../lib/types';
 
@@ -38,11 +39,14 @@ function barPct(inAmt: number, outAmt: number): number {
 export default function Expenses() {
   const { litters, activeLitterId, expenses, payers, puppies, owners } = useSpace();
   const [params, setParams] = useSearchParams();
-  const [addOpen, setAddOpen] = useState(params.get('new') === '1');
+  const litter = litters.find((l) => l.id === activeLitterId);
+  // New expenses always land on the active litter, so a terminal (closed /
+  // did-not-take) active litter blocks adding — including the ?new=1 deep link.
+  const litterClosed = !!litter && isLitterTerminal(litter);
+  const [addOpen, setAddOpen] = useState(params.get('new') === '1' && !litterClosed);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   // "This litter" (active-litter scoped) vs "All litters" (whole space aggregated).
   const [scope, setScope] = useState<'litter' | 'all'>('litter');
-  const litter = litters.find((l) => l.id === activeLitterId);
   // No active litter → nothing to scope to, so aggregate across the whole space.
   const effectiveScope = activeLitterId ? scope : 'all';
 
@@ -108,6 +112,12 @@ export default function Expenses() {
     await supabase.from('expenses').delete().eq('id', expenseId);
   }
 
+  // A terminal litter's books are final — no deleting its rows either.
+  const expenseLocked = (litterId: string | null) => {
+    const l = litters.find((x) => x.id === litterId);
+    return !!l && isLitterTerminal(l);
+  };
+
   function closeSheet() {
     setAddOpen(false);
     if (params.get('new')) {
@@ -121,8 +131,13 @@ export default function Expenses() {
       <PageHeader
         title="Money"
         subtitle={effectiveScope === 'all' ? 'All litters' : litter?.name}
-        action={<Button onClick={() => setAddOpen(true)}>＋ Add</Button>}
+        action={litterClosed ? undefined : <Button onClick={() => setAddOpen(true)}>＋ Add</Button>}
       />
+      {litterClosed && (
+        <div className="mb-3 text-[11.5px] font-semibold text-amber bg-[#f7ecdc] rounded-[10px] px-3 py-2">
+          {litter?.name} is closed — its books are final; new expenses can't be added to it.
+        </div>
+      )}
 
       {activeLitterId && (
         <div className="mb-4">
@@ -199,14 +214,16 @@ export default function Expenses() {
                     ) : (
                       <div className="flex items-center gap-2.5 flex-none">
                         <div className="text-[13.5px] font-extrabold">€{e.amount_eur.toFixed(0)}</div>
-                        <button
-                          onClick={() => setConfirmDeleteId(e.id)}
-                          className="text-[15px] text-faint hover:text-danger cursor-pointer"
-                          title="Delete expense"
-                          aria-label={`Delete ${e.description}`}
-                        >
-                          ×
-                        </button>
+                        {!expenseLocked(e.litter_id) && (
+                          <button
+                            onClick={() => setConfirmDeleteId(e.id)}
+                            className="text-[15px] text-faint hover:text-danger cursor-pointer"
+                            title="Delete expense"
+                            aria-label={`Delete ${e.description}`}
+                          >
+                            ×
+                          </button>
+                        )}
                       </div>
                     )}
                   </Card>

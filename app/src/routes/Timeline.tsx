@@ -4,12 +4,11 @@ import { useSpace } from '../state/SpaceProvider';
 import { Avatar, CircleCheckbox, EmptyState, PageHeader, SegmentedControl } from '../components/ui';
 import { diffDays, longDate, niceDate, todayStr } from '../lib/dates';
 import { effectiveDate } from '../lib/scheduling';
-import { markTaskDone } from '../lib/actions';
+import { markTaskDone, isLoggable } from '../lib/actions';
 import { STAGE_ORDER, STAGE_LABEL, STAGE_SUB, STAGE_COLOR, birthFraming } from '../lib/stages';
 
 // Tasks that record a measurement (progesterone / ultrasound) open the Complete
 // sheet; every other task just toggles done (spec §4.2).
-const isLoggable = (t: Task) => /progesterone|ultrasound/i.test(t.name);
 import TaskDetailSheet from '../components/task/TaskDetailSheet';
 import CompleteTaskSheet from '../components/task/CompleteTaskSheet';
 import TaskFormSheet from '../components/task/TaskFormSheet';

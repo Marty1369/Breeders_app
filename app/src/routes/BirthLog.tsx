@@ -3,8 +3,8 @@ import { useSpace } from '../state/SpaceProvider';
 import { useAuth } from '../state/AuthProvider';
 import { Button, Card, Chip, EmptyState, PageHeader, Select, Sheet, TextField, safeColor } from '../components/ui';
 import { longDate, todayStr } from '../lib/dates';
-import { cascadePreview, recomputeLitterDates, setActualDate } from '../lib/scheduling';
-import { startWhelping, logBirth, saveBirthDetails, finishWhelping } from '../lib/actions';
+import { recomputeLitterDates, setActualDate } from '../lib/scheduling';
+import { startWhelping, logBirth, saveBirthDetails, finishWhelping, computeDateShifts } from '../lib/actions';
 import type { BirthEvent } from '../lib/types';
 
 function clockOf(iso: string | null): string {
@@ -52,7 +52,7 @@ export default function BirthLog() {
   const earliestDelivery = events.map((e) => e.born_at).filter((x): x is string => !!x).sort()[0] ?? null;
   const previewBirthDate = earliestDelivery ? earliestDelivery.slice(0, 10) : todayStr();
   const previewNewDates = recomputeLitterDates(setActualDate(litter.dates, 'whelping', previewBirthDate));
-  const previewShift = cascadePreview(tasks.filter((t) => t.litter_id === litter.id), litter.dates, previewNewDates).length;
+  const previewShift = computeDateShifts(tasks.filter((t) => t.litter_id === litter.id), previewNewDates).length;
 
   const begin = async () => {
     setBusy(true);

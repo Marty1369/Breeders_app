@@ -58,6 +58,11 @@ export default function HandoverChecklistSheet({ puppy, onClose }: { puppy: Pupp
           No owner linked yet — link one from the puppy edit screen to track payments.
         </div>
       )}
+      {owner && !(owner.full_price > 0) && (
+        <div className="mt-3 text-[11.5px] font-semibold text-amber bg-[#f7ecdc] rounded-[10px] px-3 py-2">
+          No price set for this buyer — payment can't be verified, so handover stays locked. Set the full price on the buyer's record.
+        </div>
+      )}
     </Sheet>
   );
 }

@@ -4,6 +4,7 @@ import { useAuth } from '../state/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { Button, Card, EmptyState, PageHeader, Select, TextField } from '../components/ui';
 import { longDate, todayStr } from '../lib/dates';
+import { isLitterTerminal } from '../lib/stages';
 import type { HealthEntry } from '../lib/types';
 
 const TYPE_LABEL: Record<HealthEntry['type'], string> = {
@@ -41,8 +42,10 @@ export default function HealthLog() {
     });
   }
 
+  const litterClosed = isLitterTerminal(litter);
+
   const save = async () => {
-    if (!space || !product.trim()) return;
+    if (!space || !product.trim() || litterClosed) return;
     setBusy(true);
     await supabase.from('health_entries').insert({
       space_id: space.id,
@@ -62,6 +65,12 @@ export default function HealthLog() {
     <div className="p-4 sm:p-6 max-w-2xl mx-auto">
       <PageHeader title="Health log" subtitle={litter.name} />
 
+      {litterClosed && (
+        <div className="mb-3 text-[11.5px] font-semibold text-amber bg-[#f7ecdc] rounded-[10px] px-3 py-2">
+          {litter.name} is closed — the health record is read-only.
+        </div>
+      )}
+      {!litterClosed && (
       <Card className="p-4 mb-5">
         <div className="text-[11px] font-extrabold text-faint tracking-wide mb-3">NEW ENTRY</div>
         <div className="flex flex-col gap-3">
@@ -69,6 +78,7 @@ export default function HealthLog() {
             <option value="vaccination">Vaccination</option>
             <option value="deworming">Deworming</option>
             <option value="vet_check">Vet check</option>
+            <option value="medication">Medication</option>
           </Select>
           <div className="grid grid-cols-2 gap-3">
             <TextField label="Product" value={product} onChange={(e) => setProduct(e.target.value)} placeholder="Panacur, DHPPi…" />
@@ -97,6 +107,7 @@ export default function HealthLog() {
           <Button onClick={save} disabled={busy || !product.trim()}>{busy ? 'Saving…' : 'Add entry'}</Button>
         </div>
       </Card>
+      )}
 
       <div className="text-[11px] font-extrabold text-faint tracking-wide mb-2">HISTORY</div>
       {entries.length === 0 ? (

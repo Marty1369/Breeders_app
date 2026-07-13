@@ -3,6 +3,7 @@ import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
 import { Button, Card, EmptyState, PageHeader, SegmentedControl } from '../components/ui';
 import { longDate } from '../lib/dates';
+import { isLitterTerminal } from '../lib/stages';
 
 // Documents = a simple list of files stored with the litter: upload, store,
 // download, delete. (Contract auto-generation is parked; the field mapping in
@@ -11,12 +12,19 @@ export default function Docs() {
   const { space, activeLitterId, litters, uploads } = useSpace();
   const fileInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   // "This litter" (active-litter filtered) vs "All litters" (every doc in the space).
   const [scope, setScope] = useState<'litter' | 'all'>('litter');
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const litter = litters.find((l) => l.id === activeLitterId);
+  const litterClosed = !!litter && isLitterTerminal(litter);
+  // A closed litter's documents stay for the record; block new writes to it.
+  const uploadLocked = (litterId: string | null) => {
+    const l = litters.find((x) => x.id === litterId);
+    return !!l && isLitterTerminal(l);
+  };
   // No active litter → nothing to scope to, so fall back to showing everything.
   const effectiveScope = activeLitterId ? scope : 'all';
   const visibleUploads = uploads
@@ -25,18 +33,22 @@ export default function Docs() {
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
 
   async function uploadFile(file: File) {
-    if (!space) return;
+    if (!space || litterClosed) return;
     setBusy(true);
+    setError(null);
     const path = `${space.id}/uploads/${Date.now()}-${file.name}`;
     const { error: upErr } = await supabase.storage.from('space-files').upload(path, file);
-    if (!upErr) {
-      await supabase.from('uploads').insert({
+    if (upErr) {
+      setError(`Upload failed: ${upErr.message}`);
+    } else {
+      const { error: rowErr } = await supabase.from('uploads').insert({
         space_id: space.id,
         litter_id: activeLitterId,
         file: path,
         name: file.name,
         mime_type: file.type,
       });
+      if (rowErr) setError(`Upload failed: ${rowErr.message}`);
     }
     setBusy(false);
   }
@@ -49,8 +61,16 @@ export default function Docs() {
 
   async function deleteUpload(id: string, pathInBucket: string) {
     setConfirmDeleteId(null);
-    await supabase.storage.from('space-files').remove([pathInBucket]);
-    await supabase.from('uploads').delete().eq('id', id);
+    setError(null);
+    // Storage first, row second — if storage fails, keep the row so the file
+    // stays reachable and the user can retry (no orphaned blobs).
+    const { error: rmErr } = await supabase.storage.from('space-files').remove([pathInBucket]);
+    if (rmErr) {
+      setError(`Could not delete the file: ${rmErr.message}. Try again.`);
+      return;
+    }
+    const { error: rowErr } = await supabase.from('uploads').delete().eq('id', id);
+    if (rowErr) setError(`The file was removed but its record wasn't: ${rowErr.message}`);
   }
 
   return (
@@ -59,11 +79,19 @@ export default function Docs() {
         title="Documents"
         subtitle={litter?.name}
         action={
-          <Button onClick={() => fileInput.current?.click()} disabled={busy}>
-            {busy ? 'Uploading…' : '＋ Upload'}
-          </Button>
+          litterClosed ? undefined : (
+            <Button onClick={() => fileInput.current?.click()} disabled={busy}>
+              {busy ? 'Uploading…' : '＋ Upload'}
+            </Button>
+          )
         }
       />
+      {litterClosed && (
+        <div className="mb-3 text-[11.5px] font-semibold text-amber bg-[#f7ecdc] rounded-[10px] px-3 py-2">
+          {litter?.name} is closed — its documents are kept for the record and are read-only.
+        </div>
+      )}
+      {error && <div className="text-[12px] font-bold text-danger mb-3">{error}</div>}
       <input
         ref={fileInput}
         type="file"
@@ -123,14 +151,16 @@ export default function Docs() {
                   <button onClick={() => downloadUpload(u.file)} className="text-[11px] font-extrabold text-accent cursor-pointer px-2 py-1">
                     Download
                   </button>
-                  <button
-                    onClick={() => setConfirmDeleteId(u.id)}
-                    className="text-[15px] text-faint hover:text-danger cursor-pointer px-1"
-                    title="Delete"
-                    aria-label={`Delete ${u.name}`}
-                  >
-                    ×
-                  </button>
+                  {!uploadLocked(u.litter_id) && (
+                    <button
+                      onClick={() => setConfirmDeleteId(u.id)}
+                      className="text-[15px] text-faint hover:text-danger cursor-pointer px-1"
+                      title="Delete"
+                      aria-label={`Delete ${u.name}`}
+                    >
+                      ×
+                    </button>
+                  )}
                 </>
               )}
             </Card>

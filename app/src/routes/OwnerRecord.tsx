@@ -21,6 +21,7 @@ export default function OwnerRecord() {
   const [busy, setBusy] = useState(false);
   const [payAmount, setPayAmount] = useState('');
   const [payKind, setPayKind] = useState<'deposit' | 'final'>('deposit');
+  const [payBusy, setPayBusy] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -76,10 +77,14 @@ export default function OwnerRecord() {
   }
 
   async function addPayment() {
-    if (!payAmount) return;
-    const payment: OwnerPayment = { amount: Number(payAmount), date: todayStr(), kind: payKind };
+    const amt = Number(payAmount);
+    // Busy lock: a rapid double-tap must not append the same payment twice.
+    if (payBusy || !payAmount || !Number.isFinite(amt) || amt <= 0) return;
+    setPayBusy(true);
+    const payment: OwnerPayment = { amount: amt, date: todayStr(), kind: payKind };
     await supabase.from('owners').update({ payments: [...owner!.payments, payment] }).eq('id', owner!.id);
     setPayAmount('');
+    setPayBusy(false);
   }
 
   // Owner delete. puppies.owner_id is ON DELETE SET NULL, so any linked puppy is
@@ -137,7 +142,7 @@ export default function OwnerRecord() {
             <option value="deposit">Deposit</option>
             <option value="final">Final</option>
           </Select>
-          <Button variant="secondary" onClick={addPayment} disabled={!payAmount}>Add</Button>
+          <Button variant="secondary" onClick={addPayment} disabled={payBusy || !payAmount || Number(payAmount) <= 0}>{payBusy ? 'Adding…' : 'Add'}</Button>
         </div>
       </Card>
 
