@@ -12,7 +12,6 @@ import { STAGE_ORDER, STAGE_LABEL, STAGE_SUB, STAGE_COLOR, birthFraming } from '
 import TaskDetailSheet from '../components/task/TaskDetailSheet';
 import CompleteTaskSheet from '../components/task/CompleteTaskSheet';
 import TaskFormSheet from '../components/task/TaskFormSheet';
-import TaskViewToggle from '../components/TaskViewToggle';
 import type { Task, TaskPhase } from '../lib/types';
 
 // One taxonomy for every task surface lives in lib/stages.ts. The filter row
@@ -51,6 +50,19 @@ export default function Timeline({ mode = 'both', embedded = false }: { mode?: '
     const id = setTimeout(() => setUndoTask(null), 4500);
     return () => clearTimeout(id);
   }, [undoTask]);
+
+  // Deep link: /plan?task=<id> opens the task's detail sheet (search results,
+  // notifications). Consumed once so back/refresh doesn't re-open it.
+  const deepLinkId = params.get('task');
+  useEffect(() => {
+    if (!deepLinkId) return;
+    const t = tasks.find((x) => x.id === deepLinkId);
+    if (!t) return; // tasks may still be loading — retry on the next data tick
+    setDetailTask(t);
+    params.delete('task');
+    setParams(params, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkId, tasks]);
 
   const toggleCircle = (task: Task) => {
     if (task.status === 'done') { markTaskDone(task, false); return; } // uncheck
@@ -110,7 +122,6 @@ export default function Timeline({ mode = 'both', embedded = false }: { mode?: '
         {mode === 'both' && (
           <SegmentedControl value={view} onChange={setView} options={[{ value: 'list', label: 'List' }, { value: 'calendar', label: 'Calendar' }]} />
         )}
-        {mode === 'list' && !embedded && <TaskViewToggle current="list" />}
         {/* Stages live once, as group headers — no redundant phase-filter pills
             in the Plan tab (spec §4.1). Keep them only on the standalone screen. */}
         {embedded ? (

@@ -6,20 +6,17 @@ import type { ReactNode } from 'react';
 import { Avatar, Card, PageHeader } from '../components/ui';
 import LitterSwitcherSheet from '../components/LitterSwitcherSheet';
 import {
-  HeartPulseIcon, ScaleIcon, CrossIcon, CoinsIcon, UsersIcon, FileIcon, RepeatIcon,
-  PawIcon, DogIcon, BellIcon, SettingsIcon,
+  CoinsIcon, UsersIcon, FileIcon, DogIcon, BellIcon, SettingsIcon,
 } from '../components/icons';
 
+// Kennel = cross-litter destinations only. Care actions for the current
+// litter (whelping, weigh-in, health log, routines) live on the Puppies
+// screen and the Plan tabs, not here (audit D5/D6).
 const ITEMS: { to: string; label: string; icon: ReactNode }[] = [
-  { to: '/whelping', label: 'Whelping', icon: <HeartPulseIcon /> },
-  { to: '/weigh-in', label: 'Weigh-ins', icon: <ScaleIcon /> },
-  { to: '/health-log', label: 'Health log', icon: <CrossIcon /> },
-  { to: '/expenses', label: 'Money', icon: <CoinsIcon /> },
+  { to: '/litters', label: 'Dogs & litters', icon: <DogIcon /> },
   { to: '/buyers', label: 'Buyers', icon: <UsersIcon /> },
+  { to: '/expenses', label: 'Money', icon: <CoinsIcon /> },
   { to: '/docs', label: 'Documents', icon: <FileIcon /> },
-  { to: '/plan?tab=routines', label: 'Routines', icon: <RepeatIcon /> },
-  { to: '/dogs', label: 'Dogs & litters', icon: <DogIcon /> },
-  { to: '/litters', label: 'Litters', icon: <PawIcon /> },
   { to: '/team', label: 'Team & invites', icon: <UsersIcon /> },
   { to: '/notifications', label: 'Notifications', icon: <BellIcon /> },
   { to: '/settings', label: 'Settings', icon: <SettingsIcon /> },

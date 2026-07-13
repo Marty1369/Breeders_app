@@ -19,7 +19,6 @@ import Home from './Home';
 import Plan from './Plan';
 import Litters from './Litters';
 import NewLitterWizard from '../components/NewLitterWizard';
-import { AllDocuments, AllBuyers, AllExpenses } from './Aggregates';
 import Dogs from './Dogs';
 import LitterInfo from './LitterInfo';
 import BirthLog from './BirthLog';
@@ -204,9 +203,6 @@ export default function AppShell() {
               <Route path="/litters/new" element={<NewLitterRoute />} />
               {/* Cross-litter */}
               <Route path="/litters" element={<Litters />} />
-              <Route path="/all-documents" element={<AllDocuments />} />
-              <Route path="/all-buyers" element={<AllBuyers />} />
-              <Route path="/all-expenses" element={<AllExpenses />} />
               <Route path="/dogs" element={<Dogs />} />
               {/* Litter-scoped */}
               <Route path="/weigh-in" element={<WeighIn />} />
@@ -290,8 +286,10 @@ export default function AppShell() {
 function isMobileTabActive(to: string, path: string): boolean {
   if (to === '/') return path === '/';
   if (to === '/plan') return ['/plan', '/tasks', '/gantt', '/ongoing'].some((p) => path.startsWith(p));
-  if (to === '/puppies') return ['/puppies', '/weigh-in', '/health-log', '/whelping', '/docs'].some((p) => path.startsWith(p));
-  if (to === '/kennel') return ['/kennel', '/menu', '/litters', '/dogs', '/buyers', '/expenses', '/team', '/settings', '/all-'].some((p) => path.startsWith(p));
+  // Documents are admin/business records, launched from Kennel on mobile —
+  // highlighting Puppies for /docs would mislead (audit N7).
+  if (to === '/puppies') return ['/puppies', '/weigh-in', '/health-log', '/whelping'].some((p) => path.startsWith(p));
+  if (to === '/kennel') return ['/kennel', '/menu', '/litters', '/dogs', '/buyers', '/expenses', '/team', '/settings', '/docs'].some((p) => path.startsWith(p));
   return path === to || path.startsWith(to + '/');
 }
 

@@ -74,7 +74,7 @@ export default function LitterSwitcherSheet({ open, onClose }: { open: boolean; 
         <button
           onClick={() => {
             onClose();
-            navigate('/dogs?new_litter=1');
+            navigate('/litters/new');
           }}
           className="border-[1.5px] border-dashed border-accent-softer rounded-[11px] py-2.5 text-center text-[12px] font-extrabold text-accent cursor-pointer"
         >

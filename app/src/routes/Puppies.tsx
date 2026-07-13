@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
-import { Card, Chip, CollarAvatar, EmptyState, PageHeader } from '../components/ui';
+import { Button, Card, Chip, CollarAvatar, EmptyState, PageHeader } from '../components/ui';
+import { CrossIcon, HeartPulseIcon, ScaleIcon } from '../components/icons';
 import { hasWeightAlert } from '../lib/scheduling';
+import { isLitterTerminal } from '../lib/stages';
 import type { Puppy, PuppyStatus } from '../lib/types';
 
 const STATUS_TONE: Record<PuppyStatus, 'default' | 'accent' | 'amber' | 'danger'> = {
@@ -55,8 +57,22 @@ export default function Puppies() {
     <div className="p-4 sm:p-6 max-w-3xl mx-auto">
       <PageHeader title="Puppies" subtitle={litter?.name} />
 
+      {/* Care actions live where the puppies live (spec §2.1 / audit #2):
+          weigh-in, health log and the birth log launch from here. */}
+      {litter && !isLitterTerminal(litter) && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <Button size="sm" icon={<ScaleIcon size={15} />} onClick={() => navigate('/weigh-in')}>Weigh now</Button>
+          <Button variant="secondary" size="sm" icon={<CrossIcon size={15} />} onClick={() => navigate('/health-log')}>Health entry</Button>
+          <Button variant="secondary" size="sm" icon={<HeartPulseIcon size={15} />} onClick={() => navigate('/whelping')}>Birth log</Button>
+        </div>
+      )}
+
       {litterPuppies.length === 0 ? (
-        <EmptyState title="No puppies yet" subtitle="Puppies are added from the whelping birth log as they're born." />
+        <EmptyState
+          title="No puppies yet"
+          subtitle="Puppies are added from the whelping birth log as they're born."
+          action={litter && !isLitterTerminal(litter) ? <Button onClick={() => navigate('/whelping')}>Open birth log</Button> : undefined}
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {litterPuppies.map((p) => {

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
-import { Button, Card, Chip, EmptyState, PageHeader } from '../components/ui';
+import { Button, Card, Chip, EmptyState, PageHeader, SegmentedControl } from '../components/ui';
 import { PlusIcon } from '../components/icons';
 import { niceDate } from '../lib/dates';
 import { effectiveDate } from '../lib/scheduling';
@@ -75,10 +75,31 @@ export default function Litters() {
 
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto" onClick={() => setMenuId(null)}>
-      <PageHeader title="Litters" action={<Button icon={<PlusIcon size={15} />} onClick={() => navigate('/litters/new')}>New litter</Button>} />
+      <PageHeader title="Dogs & litters" action={<Button icon={<PlusIcon size={15} />} onClick={() => navigate('/litters/new')}>New litter</Button>} />
+
+      {/* One sidebar entry covers both — the segment swaps between them. */}
+      <div className="mb-4 max-w-[240px]">
+        <SegmentedControl
+          value="litters"
+          onChange={(v) => { if (v === 'dogs') navigate('/dogs'); }}
+          options={[
+            { value: 'litters', label: 'Litters' },
+            { value: 'dogs', label: 'Dogs' },
+          ]}
+        />
+      </div>
 
       {litters.length === 0 ? (
-        <EmptyState title="No litters yet" subtitle="Start your first litter from a dam on My dogs." action={<Button onClick={() => navigate('/litters/new')}>＋ New litter</Button>} />
+        dogs.length === 0 ? (
+          // The wizard needs a dam — a no-dog user must add her first (audit N3).
+          <EmptyState
+            title="No litters yet"
+            subtitle="A litter starts from a mum (dam) — add your dogs first, then start a litter from her."
+            action={<Button onClick={() => navigate('/dogs')}>＋ Add your dogs</Button>}
+          />
+        ) : (
+          <EmptyState title="No litters yet" subtitle="Start your first litter from a dam." action={<Button onClick={() => navigate('/litters/new')}>＋ New litter</Button>} />
+        )
       ) : (
         <div className="flex flex-col gap-5">
           {groups.map(

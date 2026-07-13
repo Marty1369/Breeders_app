@@ -38,8 +38,11 @@ const KIND_ROUTE: Record<NotificationKind, string> = {
   litter_cancelled: '/litters',
 };
 
+// Kinds whose ref_id is a task — these can deep-link straight to the task.
+const TASK_KINDS: NotificationKind[] = ['assigned', 'due', 'overdue', 'comment'];
+
 export default function Notifications() {
-  const { notifications, litters, setActiveLitterId } = useSpace();
+  const { notifications, litters, tasks, setActiveLitterId } = useSpace();
   const navigate = useNavigate();
 
   async function markAllRead() {
@@ -52,11 +55,17 @@ export default function Notifications() {
     await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id);
   }
 
-  // Tap a notification: focus its litter (when ref_id is a litter), jump to the
-  // relevant screen, and mark it read.
+  // Tap a notification: focus its litter, jump to the exact target when the
+  // kind implies one (task kinds carry a task id in ref_id), and mark it read.
   const openNotification = (n: (typeof notifications)[number]) => {
-    if (n.ref_id && litters.some((l) => l.id === n.ref_id)) setActiveLitterId(n.ref_id);
     if (!n.read_at) markRead(n.id);
+    const refTask = TASK_KINDS.includes(n.kind) && n.ref_id ? tasks.find((t) => t.id === n.ref_id) : undefined;
+    if (refTask) {
+      setActiveLitterId(refTask.litter_id);
+      navigate(`/plan?task=${refTask.id}`);
+      return;
+    }
+    if (n.ref_id && litters.some((l) => l.id === n.ref_id)) setActiveLitterId(n.ref_id);
     navigate(KIND_ROUTE[n.kind] || '/');
   };
 

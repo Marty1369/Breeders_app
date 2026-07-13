@@ -32,7 +32,8 @@ export default function WeighIn() {
 
   const [session, setSession] = useState<'am' | 'pm'>('am');
   const [mode, setMode] = useState<'all' | 'solo'>('all');
-  const [focusId, setFocusId] = useState<string | null>(null);
+  // ?puppy=<id> (from a puppy profile) pre-focuses that puppy.
+  const [focusId, setFocusId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('puppy'));
   const [input, setInput] = useState('');
   const [saved, setSaved] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);

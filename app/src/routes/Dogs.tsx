@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
-import { Button, Card, Chip, EmptyState, PageHeader, Sheet, TextField } from '../components/ui';
+import { Button, Card, Chip, EmptyState, PageHeader, SegmentedControl, Sheet, TextField } from '../components/ui';
 import { addDays, niceDate, todayStr } from '../lib/dates';
 import { nextHeatPredicted } from '../lib/scheduling';
 import type { Dog } from '../lib/types';
@@ -17,6 +17,7 @@ function ageFromDob(dob: string | null): string | null {
 
 export default function Dogs() {
   const { space, dogs, litters } = useSpace();
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [addOpen, setAddOpen] = useState(false);
   const [editDog, setEditDog] = useState<Dog | null>(null);
@@ -41,6 +42,18 @@ export default function Dogs() {
           </Button>
         }
       />
+
+      {/* One sidebar entry covers both — the segment swaps between them. */}
+      <div className="mb-4 max-w-[240px]">
+        <SegmentedControl
+          value="dogs"
+          onChange={(v) => { if (v === 'litters') navigate('/litters'); }}
+          options={[
+            { value: 'litters', label: 'Litters' },
+            { value: 'dogs', label: 'Dogs' },
+          ]}
+        />
+      </div>
 
       {dogs.length === 0 ? (
         <EmptyState

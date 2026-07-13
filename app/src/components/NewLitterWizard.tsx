@@ -115,7 +115,7 @@ export default function NewLitterWizard({
 
       setActiveLitterId(litter.id);
       onClose();
-      navigate('/tasks');
+      navigate('/plan');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create litter');
     } finally {

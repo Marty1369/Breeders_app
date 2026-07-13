@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { Button, Card, Chip, EmptyState, PageHeader } from '../components/ui';
 import { longDate } from '../lib/dates';
+import { isLitterTerminal } from '../lib/stages';
 import HandoverChecklistSheet from '../components/HandoverChecklistSheet';
+import TaskFormSheet from '../components/task/TaskFormSheet';
 
 function WeightChart({ weighLog }: { weighLog: Record<string, { am?: number; pm?: number }> }) {
   const days = Object.keys(weighLog).sort();
@@ -32,10 +34,11 @@ function WeightChart({ weighLog }: { weighLog: Record<string, { am?: number; pm?
 
 export default function PuppyProfile() {
   const { id } = useParams<{ id: string }>();
-  const { puppies, owners } = useSpace();
+  const { puppies, owners, litters, setActiveLitterId } = useSpace();
   const navigate = useNavigate();
   const puppy = puppies.find((p) => p.id === id);
   const [handoverOpen, setHandoverOpen] = useState(false);
+  const [taskOpen, setTaskOpen] = useState(false);
 
   if (!puppy) {
     return (
@@ -46,7 +49,15 @@ export default function PuppyProfile() {
   }
 
   const owner = owners.find((o) => o.id === puppy.owner_id);
+  const litter = litters.find((l) => l.id === puppy.litter_id);
+  const careLocked = (litter && isLitterTerminal(litter)) || puppy.status === 'deceased';
   const gateOk = puppy.handover.contractSigned && puppy.handover.paymentComplete && puppy.handover.chipRegistered && puppy.handover.passportGiven;
+
+  // The care screens read the current litter — focus this puppy's litter first.
+  const openCare = (path: string) => {
+    setActiveLitterId(puppy.litter_id);
+    navigate(path);
+  };
 
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto">
@@ -59,11 +70,25 @@ export default function PuppyProfile() {
       <div className="flex flex-wrap gap-1.5 mb-4">
         <Chip tone="accent">{puppy.status}</Chip>
         {puppy.handover.handedOverAt && <Chip>Handed over {longDate(puppy.handover.handedOverAt.slice(0, 10))}</Chip>}
-        {owner && <Chip tone="amber">{owner.name}</Chip>}
+        {owner && (
+          <Link to={`/owners/${owner.id}`} aria-label={`Open buyer ${owner.name}`}>
+            <Chip tone="amber">{owner.name} ↗</Chip>
+          </Link>
+        )}
       </div>
 
       <Card className="p-4 mb-4">
-        <div className="text-[11px] font-extrabold text-faint tracking-wide mb-3">WEIGHT</div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-[11px] font-extrabold text-faint tracking-wide">WEIGHT</div>
+          {!careLocked && (
+            <button
+              onClick={() => openCare(`/weigh-in?puppy=${puppy.id}`)}
+              className="text-[11px] font-extrabold text-accent cursor-pointer"
+            >
+              ＋ Add weight
+            </button>
+          )}
+        </div>
         <WeightChart weighLog={puppy.weigh_log} />
       </Card>
 
@@ -89,12 +114,17 @@ export default function PuppyProfile() {
       )}
 
       <div className="flex flex-wrap gap-2">
+        {!careLocked && (
+          <Button variant="secondary" onClick={() => openCare(`/health-log?puppy=${puppy.id}`)}>＋ Health entry</Button>
+        )}
+        <Button variant="secondary" onClick={() => setTaskOpen(true)}>＋ Task</Button>
         <Button variant="secondary" onClick={() => setHandoverOpen(true)}>
           {gateOk ? 'Handover checklist ✓' : 'Handover checklist'}
         </Button>
       </div>
 
       <HandoverChecklistSheet puppy={handoverOpen ? puppy : null} onClose={() => setHandoverOpen(false)} />
+      <TaskFormSheet open={taskOpen} litterId={puppy.litter_id} defaultName={`${puppy.name}: `} onClose={() => setTaskOpen(false)} />
     </div>
   );
 }

@@ -8,7 +8,6 @@ import TaskDetailSheet from '../components/task/TaskDetailSheet';
 import CompleteTaskSheet from '../components/task/CompleteTaskSheet';
 import TaskFormSheet from '../components/task/TaskFormSheet';
 import RuleFormSheet from '../components/RuleFormSheet';
-import TaskViewToggle from '../components/TaskViewToggle';
 import type { Task, TaskPhase } from '../lib/types';
 import { STAGE_LABEL as PHASE_LABEL, STAGE_COLOR as PHASE_COLOR, STAGE_ORDER as PHASE_ORDER } from '../lib/stages';
 
@@ -142,7 +141,6 @@ export default function Gantt({ embedded = false }: { embedded?: boolean }) {
           <Button size="sm" icon={<PlusIcon size={15} />} onClick={() => setNewTaskOpen(true)}>New task</Button>
         </div>
       </div>
-      {!embedded && <div className="my-3"><TaskViewToggle current="gantt" /></div>}
 
       {/* Legend: the 4 stage keys only (spec §4.3). Done/late are shown on the bars. */}
       <div className="flex flex-wrap gap-x-3 gap-y-1.5 mb-3 text-[11px] font-bold text-muted">

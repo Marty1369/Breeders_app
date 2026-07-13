@@ -24,7 +24,11 @@ export default function HealthLog() {
   const [type, setType] = useState<HealthEntry['type']>('vaccination');
   const [product, setProduct] = useState('');
   const [date, setDate] = useState(todayStr());
-  const [scope, setScope] = useState<'all' | string[]>('all');
+  // ?puppy=<id> (from a puppy profile) pre-selects that puppy in "applies to".
+  const [scope, setScope] = useState<'all' | string[]>(() => {
+    const pre = new URLSearchParams(window.location.search).get('puppy');
+    return pre ? [pre] : 'all';
+  });
   const [busy, setBusy] = useState(false);
 
   if (!litter) {

@@ -24,12 +24,15 @@ export default function TaskFormSheet({
   task,
   litterId,
   defaultDate,
+  defaultName,
 }: {
   open: boolean;
   onClose: () => void;
   task?: Task | null;
   litterId: string | null;
   defaultDate?: string;
+  /** Prefill for contextual creation (e.g. "＋ Task" on a puppy profile). */
+  defaultName?: string;
 }) {
   const { space, members, litters } = useSpace();
   const litter = litters.find((l) => l.id === litterId);
@@ -63,7 +66,7 @@ export default function TaskFormSheet({
       setAssignees(task.assignee_ids);
       setNotes(task.notes || '');
     } else {
-      setName('');
+      setName(defaultName || '');
       setPhase('prewhelp');
       setMode('fixed');
       setFixedDate(defaultDate || todayStr());
@@ -75,7 +78,7 @@ export default function TaskFormSheet({
       setRepeatEvery(1);
       setRepeatCount(1);
     }
-  }, [open, task, defaultDate]);
+  }, [open, task, defaultDate, defaultName]);
 
   function toggleAssignee(id: string) {
     setAssignees((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
