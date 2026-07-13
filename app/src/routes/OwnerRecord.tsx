@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
 import { Button, Card, EmptyState, PageHeader, Select, TextField } from '../components/ui';
@@ -11,7 +11,8 @@ export default function OwnerRecord() {
   const navigate = useNavigate();
   const { owners, puppies, litters } = useSpace();
   const owner = owners.find((o) => o.id === id);
-  const puppy = puppies.find((p) => p.owner_id === id);
+  // A buyer can take more than one puppy — always work with the full list (BUY-06).
+  const linkedPuppies = puppies.filter((p) => p.owner_id === id);
 
   const [form, setForm] = useState({
     name: '', address: '', phone: '', email: '', country: '',
@@ -98,7 +99,36 @@ export default function OwnerRecord() {
 
   return (
     <div className="p-4 sm:p-6 max-w-lg mx-auto">
-      <PageHeader title={owner.name} subtitle={puppy ? `Puppy: ${puppy.name}` : waitingLitter ? `Waiting list — ${waitingLitter.name}` : undefined} />
+      <PageHeader
+        title={owner.name}
+        subtitle={
+          linkedPuppies.length === 1
+            ? `Puppy: ${linkedPuppies[0].name}`
+            : linkedPuppies.length > 1
+              ? `${linkedPuppies.length} puppies`
+              : waitingLitter
+                ? `Waiting list — ${waitingLitter.name}`
+                : undefined
+        }
+      />
+
+      {linkedPuppies.length > 0 && (
+        <Card className="p-4 mb-4">
+          <div className="text-[11px] font-extrabold text-faint tracking-wide mb-2">PUPPIES</div>
+          <div className="flex flex-col">
+            {linkedPuppies.map((p) => (
+              <Link
+                key={p.id}
+                to={`/puppies/${p.id}`}
+                className="flex items-center justify-between py-2 border-b border-border-soft last:border-0"
+              >
+                <span className="text-[12.5px] font-extrabold text-accent">{p.name} ↗</span>
+                <span className="text-[11px] font-semibold text-faint">{litters.find((l) => l.id === p.litter_id)?.name}</span>
+              </Link>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card className="p-4 mb-4">
         <div className="text-[11px] font-extrabold text-faint tracking-wide mb-3">CONTACT</div>

@@ -1,11 +1,14 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSpace } from '../state/SpaceProvider';
 import { supabase } from '../lib/supabase';
 import { Button, Sheet } from './ui';
+import { closeOverlayThenNavigate } from '../lib/backClose';
 import type { Puppy } from '../lib/types';
 
 export default function HandoverChecklistSheet({ puppy, onClose }: { puppy: Puppy | null; onClose: () => void }) {
   const { owners } = useSpace();
+  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
 
   if (!puppy) return null;
@@ -55,7 +58,13 @@ export default function HandoverChecklistSheet({ puppy, onClose }: { puppy: Pupp
       </div>
       {!owner && (
         <div className="mt-3 text-[11.5px] font-semibold text-amber bg-[#f7ecdc] rounded-[10px] px-3 py-2">
-          No owner linked yet — link one from the puppy edit screen to track payments.
+          No owner linked yet — payments can't be tracked until one is.
+          <button
+            onClick={() => closeOverlayThenNavigate(onClose, () => navigate(`/puppies/${puppy.id}/edit`))}
+            className="block mt-1 font-extrabold underline cursor-pointer"
+          >
+            Link an owner →
+          </button>
         </div>
       )}
       {owner && !(owner.full_price > 0) && (

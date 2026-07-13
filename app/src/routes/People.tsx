@@ -98,12 +98,20 @@ function OwnersTab() {
       if (effectiveScope === 'litter' && !(activeLitterOwnerIds.has(o.id) || o.waiting_list_for === activeLitterId))
         return false;
       if (search && !o.name.toLowerCase().includes(search.toLowerCase())) return false;
-      if (litterFilter && o.waiting_list_for !== litterFilter) return false;
+      // A buyer belongs to a litter both via its waiting list AND via an
+      // assigned puppy (puppy.owner_id) — filtering on waiting list alone
+      // hides buyers who already reserved (audit N4).
+      if (
+        litterFilter &&
+        o.waiting_list_for !== litterFilter &&
+        !puppies.some((p) => p.litter_id === litterFilter && p.owner_id === o.id)
+      )
+        return false;
       if (waitingOnly && !o.waiting_list_for) return false;
       if (missingOnly && o.address && o.phone && o.email) return false;
       return true;
     });
-  }, [owners, search, litterFilter, waitingOnly, missingOnly, effectiveScope, activeLitterOwnerIds, activeLitterId]);
+  }, [owners, puppies, search, litterFilter, waitingOnly, missingOnly, effectiveScope, activeLitterOwnerIds, activeLitterId]);
 
   return (
     <div>
